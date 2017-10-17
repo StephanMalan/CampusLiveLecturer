@@ -27,7 +27,7 @@
     </dependencies>
 
     <build>
-        <finalName>CampusLiveStudent</finalName>
+        <finalName>CampusLiveLecturer</finalName>
         <plugins>
 
             <!-- download source code in Eclipse, best practice -->
