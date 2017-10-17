@@ -7,6 +7,7 @@ import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import models.all.*;
 
 import javax.net.ssl.SSLSocketFactory;
 import java.io.File;
