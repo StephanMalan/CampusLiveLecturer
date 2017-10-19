@@ -24,7 +24,7 @@ public class Email {
             transport.connect("smtp.gmail.com", "campuslive.recovery", "campus.live");
             MimeMessage message = new MimeMessage(session);
             message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(recipientEmail));
-            message.setSubject("Message from student");
+            message.setSubject("Message from lecturer");
             message.setText("Message sent from: " + studentName + " (" + studentEmail + ")\n\nMessage subject: \"" + subject + "\"\n\nMessage: \"" + body + "\"");
             transport.sendMessage(message, message.getAllRecipients());
             return true;

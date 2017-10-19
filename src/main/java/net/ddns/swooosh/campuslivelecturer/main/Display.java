@@ -35,7 +35,6 @@ import javafx.stage.DirectoryChooser;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 import models.all.*;
-import models.student.ClassLecturer;
 
 import javax.imageio.ImageIO;
 import java.io.ByteArrayOutputStream;
@@ -52,32 +51,32 @@ import java.util.Scanner;
 
 public class Display extends Application {
 
-    public static final File APPLICATION_FOLDER = new File(System.getProperty("user.home") + "/AppData/Local/Swooosh/CampusLiveStudent");
+    public static final File APPLICATION_FOLDER = new File(System.getProperty("user.home") + "/AppData/Local/Swooosh/CampusLiveLecturer");
     public static final File LOCAL_CACHE = new File(APPLICATION_FOLDER.getAbsolutePath() + "/Local Cache");
     public static BooleanProperty enableAnimations = new SimpleBooleanProperty(true);
     public IntegerProperty currentTimeslot = new SimpleIntegerProperty();
     private ConnectionHandler connectionHandler = new ConnectionHandler();
-    private ObservableList<ClassResultAttendance> classAndResults = FXCollections.observableArrayList();
+    private ObservableList<LecturerClass> classes = FXCollections.observableArrayList();
     private Stage stage;
     private ImageView loginLogoImageView;
-    private TextField studentNumberTextField;
+    private TextField lecturerNumberTextField;
     private PasswordField passwordField;
     private Hyperlink forgotPasswordHyperlink;
     private ProgressIndicator loginWaitIndicator;
     private JFXButton loginButton;
     private VBox loginPane;
     private Text classText;
-    private ComboBox<ClassResultAttendance> classSelectComboBox;
-    private ListView<StudentFileObservable> classFilesListView;
+    private ComboBox<LecturerClass> classSelectComboBox;
+    private ListView<LecturerFileObservable> classFilesListView;
     private GridPane timetableGridPane;
     private VBox resultsInnerPane;
     private JFXMasonryPane noticeboardInnerPane;
     private VBox contactDetailsCardPane;
     private TableView<ImportantDate> importantDateTableView;
     private VBox attendanceInnerPane;
-    private Label studentInfoLabel;
+    private Label lecturerInfoLabel;
     private SideTabPane sideTabPane;
-    private VBox studentPane;
+    private VBox lecturerPane;
     private StackPane backgroundPane;
     private StackPane contentPane;
 
@@ -92,7 +91,7 @@ public class Display extends Application {
         //Setup Stage
         //<editor-fold desc="Stage">
         stage = primaryStage;
-        stage.setTitle("CampusLive Student " + getBuild());
+        stage.setTitle("CampusLive Lecturer " + getBuild());
         stage.getIcons().add(new Image(getClass().getClassLoader().getResourceAsStream("CLLogo.png")));
         stage.setMaxWidth(1920);
         stage.setMaxHeight(1080);
@@ -121,9 +120,9 @@ public class Display extends Application {
         loginLogoImageView = new ImageView(new Image(getClass().getClassLoader().getResourceAsStream("CLLogo.png")));
         loginLogoImageView.setFitHeight(200);
         loginLogoImageView.setFitWidth(200);
-        studentNumberTextField = new TextField("DV2015-0073"); //TODO
-        studentNumberTextField.setPromptText("Student Number");
-        studentNumberTextField.getStyleClass().add("login-fields");
+        lecturerNumberTextField = new TextField("DV2010-0001"); //TODO
+        lecturerNumberTextField.setPromptText("Lecturer Number");
+        lecturerNumberTextField.getStyleClass().add("login-fields");
         passwordField = new PasswordField();
         passwordField.setText("password"); //TODO
         passwordField.setPromptText("Password");
@@ -132,13 +131,13 @@ public class Display extends Application {
         loginButton = new JFXButton("Login");
         loginButton.getStyleClass().add("login-button");
         loginButton.setOnAction((ActionEvent e) -> {
-            studentNumberTextField.setBorder(null);
+            lecturerNumberTextField.setBorder(null);
             passwordField.setBorder(null);
-            if (studentNumberTextField.getText().length() < 11) {
-                studentNumberTextField.setBorder(new Border(new BorderStroke(Color.RED, BorderStrokeStyle.SOLID, new CornerRadii(20), BorderWidths.DEFAULT)));
-                Tooltip studentNumberShortTooltip = new Tooltip("Student number too short");
-                studentNumberShortTooltip.getStyleClass().add("login-tooltip");
-                studentNumberTextField.setTooltip(studentNumberShortTooltip);
+            if (lecturerNumberTextField.getText().length() < 11) {
+                lecturerNumberTextField.setBorder(new Border(new BorderStroke(Color.RED, BorderStrokeStyle.SOLID, new CornerRadii(20), BorderWidths.DEFAULT)));
+                Tooltip lecturerNumberShortTooltip = new Tooltip("Lecturer number too short");
+                lecturerNumberShortTooltip.getStyleClass().add("login-tooltip");
+                lecturerNumberTextField.setTooltip(lecturerNumberShortTooltip);
             } else if (passwordField.getText().length() < 5) {
                 passwordField.setBorder(new Border(new BorderStroke(Color.RED, BorderStrokeStyle.SOLID, new CornerRadii(20), BorderWidths.DEFAULT)));
                 Tooltip passwordShortTooltip = new Tooltip("Password too short");
@@ -150,8 +149,8 @@ public class Display extends Application {
                 BooleanProperty waitingForAuthorisation = new SimpleBooleanProperty(true);
                 BooleanProperty authoriseResult = new SimpleBooleanProperty(false);
                 Thread loginThread = new Thread(() -> {
-                    if (connectionHandler.authorise(studentNumberTextField.getText(), passwordField.getText())) {
-                        while (connectionHandler.studentInitialized()) ;
+                    if (connectionHandler.authorise(lecturerNumberTextField.getText(), passwordField.getText())) {
+                        while (connectionHandler.lecturerInitialized()) ;
                         authoriseResult.setValue(true);
                     } else {
                         authoriseResult.setValue(false);
@@ -163,7 +162,7 @@ public class Display extends Application {
                     if (authoriseResult.getValue()) {
                         Platform.runLater(() -> {
                             contentPane.getChildren().clear();
-                            contentPane.getChildren().addAll(backgroundPane, studentPane);
+                            contentPane.getChildren().addAll(backgroundPane, lecturerPane);
                         });
                     } else {
                         Platform.runLater(() -> {
@@ -172,7 +171,7 @@ public class Display extends Application {
                             incorrectLoginTooltip.getStyleClass().add("login-tooltip");
                             passwordField.setTooltip(incorrectLoginTooltip);
                             loginPane.getChildren().clear();
-                            loginPane.getChildren().addAll(loginLogoImageView, studentNumberTextField, passwordField, loginButton, forgotPasswordHyperlink);
+                            loginPane.getChildren().addAll(loginLogoImageView, lecturerNumberTextField, passwordField, loginButton, forgotPasswordHyperlink);
                             passwordField.clear();
                             passwordField.requestFocus();
                         });
@@ -184,11 +183,12 @@ public class Display extends Application {
         forgotPasswordHyperlink = new Hyperlink("Forgot Password?");
         loginWaitIndicator = new ProgressIndicator(ProgressIndicator.INDETERMINATE_PROGRESS);
         loginWaitIndicator.setPrefSize(206, 206);
-        loginPane = new VBox(loginLogoImageView, studentNumberTextField, passwordField, loginButton, forgotPasswordHyperlink);
+        loginPane = new VBox(loginLogoImageView, lecturerNumberTextField, passwordField, loginButton, forgotPasswordHyperlink);
         loginPane.setAlignment(Pos.CENTER);
         loginPane.setSpacing(20);
         loginPane.setPadding(new Insets(10));
         loginPane.setMaxSize(500, 500);
+
         //</editor-fold>
 
         //Setup class pane
@@ -196,20 +196,20 @@ public class Display extends Application {
         classText = new Text();
         classText.setOnMouseClicked(e -> classSelectComboBox.show());
         classText.getStyleClass().add("class-heading-text");
-        classSelectComboBox = new ComboBox<>(classAndResults);
+        classSelectComboBox = new ComboBox<>(classes);
         classSelectComboBox.getStyleClass().add("class-select-combo-box");
         LecturerBadge lecturerBadge = new LecturerBadge();
         classSelectComboBox.getSelectionModel().selectedItemProperty().addListener(e -> {
             if (!classSelectComboBox.getSelectionModel().isEmpty()) {
                 classText.setText(classSelectComboBox.getSelectionModel().getSelectedItem().toString());
-                lecturerBadge.setClassLecturer(classSelectComboBox.getSelectionModel().getSelectedItem().getStudentClass().getClassLecturer());
+                lecturerBadge.setClassLecturer(connectionHandler.lecturer);
                 if (classFilesListView != null) {
                     classFilesListView.getItems().clear();
-                    ObservableList<StudentFileObservable> studentFiles = FXCollections.observableArrayList();
-                    for (ClassFile classFile : classSelectComboBox.getSelectionModel().getSelectedItem().getStudentClass().getFiles()) {
-                        studentFiles.add(new StudentFileObservable(classFile));
+                    ObservableList<LecturerFileObservable> lecturerFiles = FXCollections.observableArrayList();
+                    for (ClassFile classFile : classSelectComboBox.getSelectionModel().getSelectedItem().getFiles()) {
+                        lecturerFiles.add(new LecturerFileObservable(classFile));
                     }
-                    classFilesListView.setItems(studentFiles);
+                    classFilesListView.setItems(lecturerFiles);
                 }
             }
         });
@@ -219,7 +219,7 @@ public class Display extends Application {
         lecturerBadge.setOnMouseClicked(e -> {
             int i = UserNotification.showLecturerContactMethod(stage);
             if (i == 1) {
-                new EmailDialog(stage, lecturerBadge.getLecturerName(), lecturerBadge.getLecturerEmail(), connectionHandler.student.getStudent().getFirstName() + " " + connectionHandler.student.getStudent().getLastName(), connectionHandler.student.getStudent().getEmail()).showDialog();
+                //new EmailDialog(stage, lecturerBadge.getLecturerName(), lecturerBadge.getLecturerEmail(), connectionHandler.lecturer.getlecturer().getFirstName() + " " + connectionHandler.lecturer.getlecturer().getLastName(), connectionHandler.lecturer.getlecturer().getEmail()).showDialog();
             }
         });
         HBox classLecturerPane = new HBox(lecturerBadge);
@@ -228,9 +228,9 @@ public class Display extends Application {
         classFilesListView = new ListView<>();
         classFilesListView.getStyleClass().add("files-list-view");
         classFilesListView.setPlaceholder(new Label("No files available for this class"));
-        classFilesListView.setCellFactory(param -> new ListCell<StudentFileObservable>() {
+        classFilesListView.setCellFactory(param -> new ListCell<LecturerFileObservable>() {
             @Override
-            protected void updateItem(StudentFileObservable file, boolean empty) {
+            protected void updateItem(LecturerFileObservable file, boolean empty) {
 
                 super.updateItem(file, empty);
 
@@ -279,7 +279,7 @@ public class Display extends Application {
                     ConnectionHandler.FileDownloader fileDownloader = connectionHandler.new FileDownloader(file.getClassFile());
                     fileDownloader.start();
                     file.getClassFile().setFileDownloader(fileDownloader);
-                    connectionHandler.student.update();
+                    connectionHandler.lecturer.update();
                 });
                 ContextMenu downloadContextMenu = new ContextMenu(downloadFileMenuItem);
                 downloadContextMenu.getStyleClass().add("file-context-menu");
@@ -488,13 +488,13 @@ public class Display extends Application {
         connectionTypeLabel.getStyleClass().add("top-pane-text");
         HBox connectionTypePane = new HBox(connectionTypeLabel);
         connectionTypePane.setAlignment(Pos.CENTER);
-        studentInfoLabel = new Label();
-        studentInfoLabel.getStyleClass().add("top-pane-text");
-        HBox studentInfoPane = new HBox(studentInfoLabel);
-        studentInfoPane.setAlignment(Pos.CENTER_RIGHT);
-        HBox topPane = new HBox(jfxHamburger, logoImageView, campusLabel, connectionTypePane, studentInfoPane);
-        campusPane.minWidthProperty().bind(studentInfoLabel.widthProperty().subtract(107D));
-        campusPane.maxWidthProperty().bind(studentInfoLabel.widthProperty().subtract(107D));
+        lecturerInfoLabel = new Label();
+        lecturerInfoLabel.getStyleClass().add("top-pane-text");
+        HBox lecturerInfoPane = new HBox(lecturerInfoLabel);
+        lecturerInfoPane.setAlignment(Pos.CENTER_RIGHT);
+        HBox topPane = new HBox(jfxHamburger, logoImageView, campusLabel, connectionTypePane, lecturerInfoPane);
+        campusPane.minWidthProperty().bind(lecturerInfoLabel.widthProperty().subtract(107D));
+        campusPane.maxWidthProperty().bind(lecturerInfoLabel.widthProperty().subtract(107D));
         HBox.setHgrow(connectionTypePane, Priority.ALWAYS);
         topPane.getStyleClass().add("top-pane");
         //</editor-fold>
@@ -506,9 +506,9 @@ public class Display extends Application {
         backgroundPane.setEffect(new GaussianBlur(50));
         //</editor-fold>
 
-        //Setup student pane
-        //<editor-fold desc="Student Pane">
-        studentPane = new VBox(topPane, sideTabPane);
+        //Setup lecturer pane
+        //<editor-fold desc="Lecturer Pane">
+        lecturerPane = new VBox(topPane, sideTabPane);
         VBox.setVgrow(sideTabPane, Priority.ALWAYS);
         //</editor-fold>
 
@@ -517,31 +517,31 @@ public class Display extends Application {
         contentPane = new StackPane(backgroundPane, loginPane);
         //</editor-fold>
 
-        //Setup student update listener
-        //<editor-fold desc="Student Update Listener">
-        connectionHandler.student.update.addListener((observable, oldV, newV) -> {
+        //Setup lecturer update listener
+        //<editor-fold desc="lecturer Update Listener">
+        connectionHandler.lecturer.update.addListener((observable, oldV, newV) -> {
             if (newV) {
-                System.out.println("Student updated");
-                if (connectionHandler.student.getStudent() != null && connectionHandler.student.getStudent().getClassResultAttendances() != null) {
+                System.out.println("lecturer updated");
+                if (connectionHandler.lecturer.getLecturer() != null && connectionHandler.lecturer.getLecturer().getClasses() != null) {
                     Platform.runLater(() -> {
                         String prevSelected = null;
                         if (!classSelectComboBox.getSelectionModel().isEmpty()) {
-                            prevSelected = classSelectComboBox.getSelectionModel().getSelectedItem().getStudentClass().getModuleNumber();
+                            prevSelected = classSelectComboBox.getSelectionModel().getSelectedItem().getModuleNumber();
                         }
-                        classAndResults.clear();
-                        classAndResults.addAll(connectionHandler.student.getStudent().getClassResultAttendances());
+                        classes.clear();
+                        classes.addAll(connectionHandler.lecturer.getLecturer().getClasses());
                         resultsInnerPane.getChildren().clear();
-                        for (ClassResultAttendance result : classAndResults) {
-                            resultsInnerPane.getChildren().add(new ResultPane(result));
+                        for (LecturerClass result : classes) {
+                            //resultsInnerPane.getChildren().add(new ResultPane(result));//
                         }
                         if (prevSelected == null) {
                             SetTimeSlot:
                             if (!classSelectComboBox.getItems().isEmpty()) {
                                 int dayOfWeek = Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1;
-                                for (ClassResultAttendance car : classSelectComboBox.getItems()) {
-                                    for (ClassTime ct : car.getStudentClass().getClassTimes()) {
+                                for (LecturerClass lc : classSelectComboBox.getItems()) {
+                                    for (ClassTime ct : lc.getClassTimes()) {
                                         if (ct.getDayOfWeek() == dayOfWeek && currentTimeslot.get() >= ct.getStartSlot() && currentTimeslot.get() <= ct.getEndSlot()) {
-                                            classSelectComboBox.getSelectionModel().select(car);
+                                            classSelectComboBox.getSelectionModel().select(lc);
                                             break SetTimeSlot;
                                         }
                                     }
@@ -549,14 +549,14 @@ public class Display extends Application {
                                 classSelectComboBox.getSelectionModel().select(0);
                             }
                         } else {
-                            for (ClassResultAttendance car : classAndResults) {
-                                if (car.getStudentClass().getModuleNumber().equals(prevSelected)) {
-                                    classSelectComboBox.getSelectionModel().select(car);
+                            for (LecturerClass lc : classes) {
+                                if (lc.getModuleNumber().equals(prevSelected)) {
+                                    classSelectComboBox.getSelectionModel().select(lc);
                                 }
                             }
                         }
-                        Student student = connectionHandler.student.getStudent();
-                        studentInfoLabel.setText(student.getFirstName() + " " + student.getLastName() + " " + student.getStudentNumber());
+                        Lecturer lecturer = connectionHandler.lecturer.getLecturer();
+                        lecturerInfoLabel.setText(lecturer.getFirstName() + " " + lecturer.getLastName() + " " + lecturer.getLecturerNumber());
                         populateTimetable();
                         populateContactDetails();
                         populateImportantDates();
@@ -570,9 +570,6 @@ public class Display extends Application {
         //Setup noticeboard update listener
         //<editor-fold desc="Noticeboard Update Listener">
         connectionHandler.notices.addListener((InvalidationListener) e -> {
-            populateNoticeBoard();
-        });
-        connectionHandler.notifications.addListener((InvalidationListener) e -> {
             populateNoticeBoard();
         });
         //</editor-fold>
@@ -669,7 +666,7 @@ public class Display extends Application {
     }
 
     private void populateTimetable() {
-        List<ClassResultAttendance> classAndResults = classSelectComboBox.getItems();
+        List<LecturerClass> classes = classSelectComboBox.getItems();
         timetableGridPane.getChildren().clear();
         String[] weekdays = {"Mo", "Tu", "We", "Th", "Fr"};
         for (int i = 0; i < 5; i++) {
@@ -689,15 +686,15 @@ public class Display extends Application {
             timetableGridPane.add(labelPane, i + 1, 0);
         }
         int classNumber = 0;
-        for (ClassResultAttendance cr : classAndResults) {
-            String moduleName = cr.getStudentClass().getModuleName();
-            String lecturerInitials = cr.getStudentClass().getClassLecturer().getFirstName().charAt(0) + "" + cr.getStudentClass().getClassLecturer().getLastName().charAt(0);
-            for (ClassTime ct : cr.getStudentClass().getClassTimes()) {
+        for (LecturerClass lc : classes) {
+            String moduleName = lc.getModuleName();
+            String lecturerInitials = connectionHandler.lecturer.getLecturer().getFirstName().charAt(0) + "" + connectionHandler.lecturer.getLecturer().getLastName().charAt(0);
+            for (ClassTime ct : lc.getClassTimes()) {
                 for (int i = ct.getStartSlot(); i <= ct.getEndSlot(); i++) {
                     TimetableBlock timetableBlock = new TimetableBlock(moduleName + "\n\n" + lecturerInitials + " (" + ct.getRoomNumber() + ")", classNumber);
                     timetableBlock.setOnMouseClicked(e -> {
                         Platform.runLater(() -> {
-                            classSelectComboBox.getSelectionModel().select(cr);
+                            classSelectComboBox.getSelectionModel().select(lc);
                             sideTabPane.select(0);
                         });
                     });
@@ -712,9 +709,6 @@ public class Display extends Application {
 
     private void populateNoticeBoard() {
         ObservableList<StackPane> noticePanes = FXCollections.observableArrayList();
-        for (Notification nb : connectionHandler.notifications) {
-            noticePanes.add(new NoticeboardCard(stage, nb.getHeading(), nb.getDescription(), false));
-        }
         for (Notice nb : connectionHandler.notices) {
             noticePanes.add(new NoticeboardCard(stage, nb.getHeading(), nb.getDescription(), true));
         }
@@ -723,30 +717,10 @@ public class Display extends Application {
     }
 
     private void populateContactDetails() {
-        if (connectionHandler.student.getStudent() != null) {
+        if (connectionHandler.lecturer.getLecturer() != null) {
             ObservableList<ContactDetailsCard> contactDetailsCards = FXCollections.observableArrayList();
             for (ContactDetails contactDetails : connectionHandler.contactDetails) {
-                contactDetailsCards.add(new ContactDetailsCard(stage, contactDetails, connectionHandler.student.getStudent().getFirstName() + " " + connectionHandler.student.getStudent().getLastName(), connectionHandler.student.getStudent().getEmail()));
-            }
-            ObservableList<String> lecturersCompleted = FXCollections.observableArrayList();
-            for (ClassResultAttendance cra : classAndResults) {
-                ClassLecturer classLecturer = cra.getStudentClass().getClassLecturer();
-                byte[] lecturerImageBytes = new byte[0];
-                try {
-                    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-                    ImageIO.write(SwingFXUtils.fromFXImage(classLecturer.getLecturerImage(), null), "jpg", byteArrayOutputStream);
-                    byteArrayOutputStream.flush();
-                    lecturerImageBytes = byteArrayOutputStream.toByteArray();
-                    byteArrayOutputStream.close();
-                } catch (Exception ex) {
-                    ex.printStackTrace();
-                }
-                ContactDetails newContactDetails = new ContactDetails(classLecturer.getFirstName() + " " + classLecturer.getLastName(), "ClassLecturer", classLecturer.getContactNumber(), classLecturer.getEmail(), lecturerImageBytes);
-                ContactDetailsCard contactDetailsCard = new ContactDetailsCard(stage, newContactDetails, connectionHandler.student.getStudent().getFirstName() + " " + connectionHandler.student.getStudent().getLastName(), connectionHandler.student.getStudent().getEmail());
-                if (!lecturersCompleted.contains(classLecturer.getLecturerID())) {
-                    contactDetailsCards.add(contactDetailsCard);
-                    lecturersCompleted.add(classLecturer.getLecturerID());
-                }
+                contactDetailsCards.add(new ContactDetailsCard(stage, contactDetails, connectionHandler.lecturer.getLecturer().getFirstName() + " " + connectionHandler.lecturer.getLecturer().getLastName(), connectionHandler.lecturer.getLecturer().getEmail()));
             }
             contactDetailsCardPane.getChildren().clear();
             contactDetailsCardPane.getChildren().addAll(contactDetailsCards);
@@ -759,9 +733,9 @@ public class Display extends Application {
 
     private void populateAttendance() {
         attendanceInnerPane.getChildren().clear();
-        for (ClassResultAttendance cra : classAndResults) {
-            attendanceInnerPane.getChildren().add(new AttendanceCard(cra.getStudentClass().getModuleName(), cra.getAttendance()));
-        }
+        /*for (ClassResultAttendance cra : classAndResults) {
+            attendanceInnerPane.getChildren().add(new AttendanceCard(cra.getLecturerClass().getModuleName(), cra.getAttendance()));
+        }*/
     }
 
     private String getBuild() {

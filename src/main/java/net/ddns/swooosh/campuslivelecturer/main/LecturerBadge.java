@@ -6,14 +6,14 @@ import javafx.scene.paint.Color;
 import javafx.scene.paint.ImagePattern;
 import javafx.scene.shape.Circle;
 import javafx.scene.text.Text;
-import models.student.ClassLecturer;
+import models.all.LecturerObservable;
 
 public class LecturerBadge extends HBox {
 
     private Circle lecturerPicture;
     private Text lecturerText;
     private HBox lecturerTextPane;
-    private ClassLecturer classLecturer;
+    private LecturerObservable lecturer;
 
     public LecturerBadge() {
         lecturerPicture = new Circle(30);
@@ -36,10 +36,10 @@ public class LecturerBadge extends HBox {
         setPickOnBounds(false);
     }
 
-    public void setClassLecturer(ClassLecturer classLecturer) {
-        this.classLecturer = classLecturer;
-        lecturerPicture.setFill(new ImagePattern(classLecturer.getLecturerImage()));
-        lecturerText.setText(classLecturer.getFirstName() + " " + classLecturer.getLastName());
+    public void setClassLecturer(LecturerObservable lecturer) {
+        this.lecturer = lecturer;
+        lecturerPicture.setFill(new ImagePattern(lecturer.getLecturer().getImage()));
+        lecturerText.setText(lecturer.getLecturer().getFirstName() + " " + lecturer.getLecturer().getLastName());
     }
 
     public String getLecturerName() {
@@ -47,6 +47,6 @@ public class LecturerBadge extends HBox {
     }
 
     public String getLecturerEmail() {
-        return classLecturer.getEmail();
+        return lecturer.getLecturer().getEmail();
     }
 }

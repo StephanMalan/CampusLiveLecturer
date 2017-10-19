@@ -8,6 +8,8 @@ import javafx.beans.property.SimpleIntegerProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import models.all.*;
+import models.lecturer.LecturerStudentAttendance;
+import models.lecturer.LecturerStudentResult;
 
 import javax.net.ssl.SSLSocketFactory;
 import java.io.File;
@@ -23,11 +25,12 @@ public class ConnectionHandler {
     public static final int PORT = 25760;
     public static final String LOCAL_ADDRESS = "127.0.0.1";
     public static final String INTERNET_ADDRESS = "swooosh.ddns.net";
-    public StudentObservable student = new StudentObservable(null);
+    public LecturerObservable lecturer = new LecturerObservable(null);
     public volatile ObservableList<Notice> notices = FXCollections.observableArrayList();
-    public volatile ObservableList<Notification> notifications = FXCollections.observableArrayList();
     public volatile ObservableList<ContactDetails> contactDetails = FXCollections.observableArrayList();
     public volatile ObservableList<ImportantDate> importantDates = FXCollections.observableArrayList();
+    public volatile ObservableList<LecturerStudentAttendance> studentAttendance = FXCollections.observableArrayList();
+    public volatile ObservableList<LecturerStudentResult> studentResults = FXCollections.observableArrayList();
     public volatile ObservableList<String> outputQueue = FXCollections.observableArrayList();
     public volatile ObservableList<Object> inputQueue = FXCollections.observableArrayList();
     public String connectionType = "On Campus";
@@ -92,14 +95,9 @@ public class ConnectionHandler {
     }
 
     //<editor-fold desc="Commands">
-    public Boolean authorise(String studentNumber, String password) {
-        outputQueue.add("sa:" + studentNumber + ":" + password);
-        return getStringReply("sa:");
-    }
-
-    public Boolean isLecturerOnline(String lecturerNumber) {
-        outputQueue.add("lo:" + lecturerNumber);
-        return getStringReply("lo:");
+    public Boolean authorise(String lecturerNumber, String password) {
+        outputQueue.add("la:" + lecturerNumber + ":" + password);
+        return getStringReply("la:");
     }
 
     public Boolean changePassword(String prevPassword, String newPassword) {
@@ -110,10 +108,6 @@ public class ConnectionHandler {
     public Boolean forgotPassword(String email) {
         outputQueue.add("fp:" + email);
         return getStringReply("fp:");
-    }
-
-    public void sendMessage(String message, String lecturerNumber) {
-        outputQueue.add("sm:" + message + ":" + lecturerNumber);
     }
 
     public void deleteFile(int classID, String fileName) {
@@ -145,8 +139,8 @@ public class ConnectionHandler {
 
     public void updateSavedFiles() {
         Boolean updated = false;
-        for (ClassResultAttendance car : student.getStudent().getClassResultAttendances()) {
-            for (ClassFile cf : car.getStudentClass().getFiles()) {
+        for (LecturerClass lc : lecturer.getLecturer().getClasses()) {
+            for (ClassFile cf : lc.getFiles()) {
                 File f;
                 if ((f = new File(Display.LOCAL_CACHE + "/" + cf.getClassID() + "/" + cf.getFileName())).exists() && f.length() == cf.getFileLength()) {
                     if (cf.getValue() != 1) {
@@ -160,10 +154,10 @@ public class ConnectionHandler {
                 }
             }
             try {
-                File classFolder = new File(Display.LOCAL_CACHE + "/" + car.getStudentClass().getClassID());
+                File classFolder = new File(Display.LOCAL_CACHE + "/" + lc.getId());
                 for (File file : classFolder.listFiles()) {
                     Boolean found = false;
-                    for (ClassFile cf : car.getStudentClass().getFiles()) {
+                    for (ClassFile cf : lc.getFiles()) {
                         if (cf.getFileName().equals(file.getName()) && cf.getFileLength() == file.length()) {
                             found = true;
                         }
@@ -177,7 +171,7 @@ public class ConnectionHandler {
             }
         }
         if (updated) {
-            Platform.runLater(() -> student.update());
+            Platform.runLater(() -> lecturer.update());
             System.out.println("Files Updated");
         }
     }
@@ -207,8 +201,8 @@ public class ConnectionHandler {
         return contactDetails;
     }
 
-    public Boolean studentInitialized() {
-        return student.getStudent() != null;
+    public Boolean lecturerInitialized() {
+        return lecturer.getLecturer() != null;
     }
 
     private class InputProcessor extends Thread {
@@ -216,21 +210,17 @@ public class ConnectionHandler {
             while (true) {
                 Object input;
                 if ((input = getReply()) != null) {
-                    if (input instanceof Student) {
-                        student.setStudent((Student) input);
+                    if (input instanceof Lecturer) {
+                        lecturer.setLecturer((Lecturer) input);
                         updateSavedFiles();
-                        student.update();
-                        System.out.println("Updated Student");
+                        lecturer.update();
+                        System.out.println("Updated Lecturer");
                     } else if (input instanceof List<?>) {
                         List list = (List) input;
                         if (!list.isEmpty() && list.get(0) instanceof Notice) {
                             notices.clear();
                             notices.addAll(list);
                             System.out.println("Updated Notices");
-                        } else if (!list.isEmpty() && list.get(0) instanceof Notification) {
-                            notifications.clear();
-                            notifications.addAll(list);
-                            System.out.println("Updated Notifications (" + notifications.size() + ")");
                         } else if (!list.isEmpty() && list.get(0) instanceof ContactDetails) {
                             contactDetails.clear();
                             contactDetails.addAll(list);
@@ -238,6 +228,14 @@ public class ConnectionHandler {
                         } else if (!list.isEmpty() && list.get(0) instanceof ImportantDate) {
                             importantDates.clear();
                             importantDates.addAll(list);
+                            System.out.println("Updated Important Dates");
+                        } else if (!list.isEmpty() && list.get(0) instanceof LecturerStudentAttendance) {
+                            studentAttendance.clear();
+                            studentAttendance.addAll(list);
+                            System.out.println("Updated Important Dates");
+                        } else if (!list.isEmpty() && list.get(0) instanceof LecturerStudentResult) {
+                            studentResults.clear();
+                            studentResults.addAll(list);
                             System.out.println("Updated Important Dates");
                         }
                     } else {
@@ -299,7 +297,7 @@ public class ConnectionHandler {
                     }
                     size.set(size.get() + filePartToRemove.getFileBytes().length);
                     progress.set(1D * size.get() / bytes.length);
-                    Platform.runLater(() -> student.update());
+                    Platform.runLater(() -> lecturer.update());
                     inputQueue.remove(filePartToRemove);
                 }
                 if (size.get() == file.getFileLength()) {

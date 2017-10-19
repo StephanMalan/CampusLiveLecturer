@@ -6,13 +6,13 @@ import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import net.ddns.swooosh.campuslivelecturer.main.ConnectionHandler;
 
-public class StudentFileObservable {
+public class LecturerFileObservable {
 
     private ClassFile classFile;
     private DoubleProperty progress;
     private IntegerProperty type;
 
-    public StudentFileObservable(ClassFile classFile) {
+    public LecturerFileObservable(ClassFile classFile) {
         this.classFile = classFile;
         progress = new SimpleDoubleProperty();
         type = new SimpleIntegerProperty();

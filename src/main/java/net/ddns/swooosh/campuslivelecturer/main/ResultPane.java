@@ -6,12 +6,11 @@ import javafx.scene.Node;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Text;
-import models.all.ClassResultAttendance;
 import models.all.Result;
 
 public class ResultPane extends VBox {
 
-    private ClassResultAttendance classAndResult;
+    /*private ClassResultAttendance classAndResult;
     private Boolean extended;
 
     public ResultPane(ClassResultAttendance classAndResult) {
@@ -124,6 +123,6 @@ public class ResultPane extends VBox {
 
     public Boolean getExtended() {
         return extended;
-    }
+    }*/
 
 }

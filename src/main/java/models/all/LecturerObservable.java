@@ -3,22 +3,22 @@ package models.all;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 
-public class StudentObservable {
+public class LecturerObservable {
 
-    private Student student;
+    private Lecturer lecturer;
     public volatile BooleanProperty update;
 
-    public StudentObservable(Student student) {
-        this.student = student;
+    public LecturerObservable(Lecturer lecturer) {
+        this.lecturer = lecturer;
         update = new SimpleBooleanProperty(false);
     }
 
-    public Student getStudent() {
-        return student;
+    public Lecturer getLecturer() {
+        return lecturer;
     }
 
-    public void setStudent(Student student) {
-        this.student = student;
+    public void setLecturer(Lecturer lecturer) {
+        this.lecturer = lecturer;
     }
 
     public void update() {
