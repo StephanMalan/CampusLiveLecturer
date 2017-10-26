@@ -201,7 +201,7 @@ public class Display extends Application {
         LecturerBadge lecturerBadge = new LecturerBadge();
         classSelectComboBox.getSelectionModel().selectedItemProperty().addListener(e -> {
             if (!classSelectComboBox.getSelectionModel().isEmpty()) {
-                classText.setText(classSelectComboBox.getSelectionModel().getSelectedItem().toString());
+                classText.setText(classSelectComboBox.getSelectionModel().getSelectedItem().getModuleName());
                 lecturerBadge.setClassLecturer(connectionHandler.lecturer);
                 if (classFilesListView != null) {
                     classFilesListView.getItems().clear();

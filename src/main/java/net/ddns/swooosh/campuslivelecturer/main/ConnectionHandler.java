@@ -117,7 +117,7 @@ public class ConnectionHandler {
 
     public void sendData(String data) {
         try {
-            objectOutputStream.writeUTF(data);
+            objectOutputStream.writeObject(data);
             objectOutputStream.flush();
             System.out.println("Sent data: " + data);
         } catch (Exception ex) {
