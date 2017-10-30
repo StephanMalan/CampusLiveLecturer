@@ -38,9 +38,4 @@ public class LecturerClass implements Serializable{
     public List<ClassFile> getFiles() {
         return files;
     }
-
-    @Override
-    public String toString() {
-        return moduleName;
-    }
 }
