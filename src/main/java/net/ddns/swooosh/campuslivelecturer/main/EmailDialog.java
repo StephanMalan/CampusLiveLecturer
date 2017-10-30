@@ -15,7 +15,7 @@ public class EmailDialog extends CustomDialogSkin {
 
     private StackPane contentPane;
 
-    public EmailDialog(Window parent, String recipientName, String recipientEmail,  String studentName, String studentEmail) {
+    public EmailDialog(Window parent, String recipientName, String recipientEmail, String studentName, String studentEmail) {
         initOwner(parent);
         Text headingText = new Text("Send email to " + recipientName);
         headingText.setStyle("-fx-font-size: 24;" +
@@ -44,14 +44,14 @@ public class EmailDialog extends CustomDialogSkin {
             if (!subjectTextField.getText().isEmpty() && !messageTextArea.getText().isEmpty()) {
                 new Thread(() -> {
                     if (Email.emailMessage(studentName, studentEmail, recipientEmail, subjectTextField.getText(), messageTextArea.getText())) {
-                        //TODO success message
+                        UserNotification.showConfirmationMessage("Send Email", "Successfully sent email to " + recipientEmail);
                     } else {
-                        //TODO error message
+                        UserNotification.showErrorMessage("Send Email", "Failed to send email to " + recipientEmail);
                     }
                 }).start();
                 closeAnimation();
             } else {
-                //TODO error message
+                UserNotification.showErrorMessage("Send Email", "Invalid input values");
             }
         });
         JFXButton cancelButton = new JFXButton("Cancel");

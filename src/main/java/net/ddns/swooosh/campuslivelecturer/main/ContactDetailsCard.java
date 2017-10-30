@@ -3,6 +3,7 @@ package net.ddns.swooosh.campuslivelecturer.main;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Hyperlink;
+import javafx.scene.image.Image;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -11,12 +12,17 @@ import javafx.scene.shape.Circle;
 import javafx.scene.text.Text;
 import javafx.stage.Window;
 import models.all.ContactDetails;
+import net.ddns.swooosh.campuslivelecturer.main.EmailDialog;
 
 public class ContactDetailsCard extends HBox {
 
     public ContactDetailsCard(Window parent, ContactDetails contactDetails, String studentName, String studentEmail) {
         Circle contactImage = new Circle(30);
-        contactImage.setFill(new ImagePattern(contactDetails.getImage()));
+        if (contactDetails.getImage() == null) {
+            contactImage.setFill(new ImagePattern(new Image(getClass().getClassLoader().getResourceAsStream("DefaultProfile.jpg"))));
+        } else {
+            contactImage.setFill(new ImagePattern(contactDetails.getImage()));
+        }
         contactImage.setStroke(Color.BLACK);
         contactImage.setStrokeWidth(2);
         Text contactName = new Text(contactDetails.getName());
@@ -27,7 +33,6 @@ public class ContactDetailsCard extends HBox {
         contactMainPane.setMinWidth(500);
         contactMainPane.setMaxWidth(500);
         Text contactNumber = new Text(contactDetails.getContactNumber());
-        //Text contactEmail = new Text(contactDetails.getEmail());
         Hyperlink contactEmail = new Hyperlink(contactDetails.getEmail());
         contactEmail.setOnAction(e -> {
             new EmailDialog(parent, contactDetails.getName(), contactDetails.getEmail(), studentName, studentEmail).showDialog();
@@ -37,8 +42,11 @@ public class ContactDetailsCard extends HBox {
         contactEmail.setStyle("-fx-effect: null");
         setStyle("-fx-background-color: white;" +
                 "-fx-border-color: black;" +
+                "-fx-border-width: 2;" +
                 "-fx-min-width: 1000;" +
-                "-fx-max-width: 1000");
+                "-fx-max-width: 1000;" +
+                "-fx-border-radius: 15;" +
+                "-fx-background-radius: 15");
         setSpacing(25);
         setAlignment(Pos.CENTER_LEFT);
         setPadding(new Insets(5));

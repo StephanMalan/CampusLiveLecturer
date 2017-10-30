@@ -1,6 +1,5 @@
 package net.ddns.swooosh.campuslivelecturer.main;
 
-//TODO
 import com.jfoenix.controls.JFXButton;
 import com.jfoenix.controls.JFXHamburger;
 import com.jfoenix.controls.JFXMasonryPane;
@@ -16,7 +15,6 @@ import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-import javafx.embed.swing.SwingFXUtils;
 import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -32,23 +30,19 @@ import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Text;
 import javafx.stage.DirectoryChooser;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 import models.all.*;
-import models.student.ClassLecturer;
+import models.lecturer.*;
 
-import javax.imageio.ImageIO;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.List;
-import java.util.Scanner;
+import java.util.*;
 
 public class Display extends Application {
 
@@ -57,42 +51,40 @@ public class Display extends Application {
     public static BooleanProperty enableAnimations = new SimpleBooleanProperty(true);
     public IntegerProperty currentTimeslot = new SimpleIntegerProperty();
     private ConnectionHandler connectionHandler = new ConnectionHandler();
-    private ObservableList<ClassResultAttendance> classAndResults = FXCollections.observableArrayList();
+    private ObservableList<LecturerClass> classAndResults = FXCollections.observableArrayList();
     private Stage stage;
     private ImageView loginLogoImageView;
-    private TextField studentNumberTextField;
+    private TextField lecturerNumberTextField;
     private PasswordField passwordField;
     private Hyperlink forgotPasswordHyperlink;
     private ProgressIndicator loginWaitIndicator;
     private JFXButton loginButton;
     private VBox loginPane;
     private Text classText;
-    private ComboBox<ClassResultAttendance> classSelectComboBox;
-    private ListView<StudentFileObservable> classFilesListView;
+    private ComboBox<LecturerClass> classSelectComboBox;
+    private HBox classHeadingPane;
+    private Button doAttendanceButton;
+    private ListView<LecturerFileObservable> classFilesListView;
     private GridPane timetableGridPane;
     private VBox resultsInnerPane;
     private JFXMasonryPane noticeboardInnerPane;
     private VBox contactDetailsCardPane;
     private TableView<ImportantDate> importantDateTableView;
     private VBox attendanceInnerPane;
-    private Label studentInfoLabel;
+    private Label lecturerInfoLabel;
     private SideTabPane sideTabPane;
-    private VBox studentPane;
+    private VBox lecturerPane;
     private StackPane backgroundPane;
     private StackPane contentPane;
+    private volatile BooleanProperty uploading = new SimpleBooleanProperty(false);
 
     @Override
     public void start(Stage primaryStage) throws Exception {
 
-        //Start timeslot updater
-        //<editor-fold desc="Timeslot Updater">
-        new TimeslotUpdater().start();
-        //</editor-fold>
-
         //Setup Stage
         //<editor-fold desc="Stage">
         stage = primaryStage;
-        stage.setTitle("CampusLive Student " + getBuild());
+        stage.setTitle("CampusLive Lecturer " + getBuild());
         stage.getIcons().add(new Image(getClass().getClassLoader().getResourceAsStream("CLLogo.png")));
         stage.setMaxWidth(1920);
         stage.setMaxHeight(1080);
@@ -121,9 +113,9 @@ public class Display extends Application {
         loginLogoImageView = new ImageView(new Image(getClass().getClassLoader().getResourceAsStream("CLLogo.png")));
         loginLogoImageView.setFitHeight(200);
         loginLogoImageView.setFitWidth(200);
-        studentNumberTextField = new TextField("DV2015-0073"); //TODO
-        studentNumberTextField.setPromptText("Student Number");
-        studentNumberTextField.getStyleClass().add("login-fields");
+        lecturerNumberTextField = new TextField("DV001"); //TODO
+        lecturerNumberTextField.setPromptText("Lecturer Number");
+        lecturerNumberTextField.getStyleClass().add("login-fields");
         passwordField = new PasswordField();
         passwordField.setText("password"); //TODO
         passwordField.setPromptText("Password");
@@ -132,13 +124,13 @@ public class Display extends Application {
         loginButton = new JFXButton("Login");
         loginButton.getStyleClass().add("login-button");
         loginButton.setOnAction((ActionEvent e) -> {
-            studentNumberTextField.setBorder(null);
+            lecturerNumberTextField.setBorder(null);
             passwordField.setBorder(null);
-            if (studentNumberTextField.getText().length() < 11) {
-                studentNumberTextField.setBorder(new Border(new BorderStroke(Color.RED, BorderStrokeStyle.SOLID, new CornerRadii(20), BorderWidths.DEFAULT)));
-                Tooltip studentNumberShortTooltip = new Tooltip("Student number too short");
-                studentNumberShortTooltip.getStyleClass().add("login-tooltip");
-                studentNumberTextField.setTooltip(studentNumberShortTooltip);
+            if (lecturerNumberTextField.getText().length() < 5) {
+                lecturerNumberTextField.setBorder(new Border(new BorderStroke(Color.RED, BorderStrokeStyle.SOLID, new CornerRadii(20), BorderWidths.DEFAULT)));
+                Tooltip lecturerNumberShortTooltip = new Tooltip("Lecturer number too short");
+                lecturerNumberShortTooltip.getStyleClass().add("login-tooltip");
+                lecturerNumberTextField.setTooltip(lecturerNumberShortTooltip);
             } else if (passwordField.getText().length() < 5) {
                 passwordField.setBorder(new Border(new BorderStroke(Color.RED, BorderStrokeStyle.SOLID, new CornerRadii(20), BorderWidths.DEFAULT)));
                 Tooltip passwordShortTooltip = new Tooltip("Password too short");
@@ -150,8 +142,14 @@ public class Display extends Application {
                 BooleanProperty waitingForAuthorisation = new SimpleBooleanProperty(true);
                 BooleanProperty authoriseResult = new SimpleBooleanProperty(false);
                 Thread loginThread = new Thread(() -> {
-                    if (connectionHandler.authorise(studentNumberTextField.getText(), passwordField.getText())) {
-                        while (connectionHandler.studentInitialized()) ;
+                    if (connectionHandler.authorise(lecturerNumberTextField.getText(), passwordField.getText())) {
+                        while (!connectionHandler.lecturerInitialized()) {
+                            try {
+                                Thread.sleep(10);
+                            } catch (InterruptedException e1) {
+                                e1.printStackTrace();
+                            }
+                        }
                         authoriseResult.setValue(true);
                     } else {
                         authoriseResult.setValue(false);
@@ -161,9 +159,12 @@ public class Display extends Application {
                 loginThread.start();
                 waitingForAuthorisation.addListener(al -> {
                     if (authoriseResult.getValue()) {
+                        if (connectionHandler.isDefaultPassword()) {
+                            Platform.runLater(() -> new ChangePasswordDialog(stage, true, connectionHandler).showDialog());
+                        }
                         Platform.runLater(() -> {
                             contentPane.getChildren().clear();
-                            contentPane.getChildren().addAll(backgroundPane, studentPane);
+                            contentPane.getChildren().addAll(backgroundPane, lecturerPane);
                         });
                     } else {
                         Platform.runLater(() -> {
@@ -172,7 +173,7 @@ public class Display extends Application {
                             incorrectLoginTooltip.getStyleClass().add("login-tooltip");
                             passwordField.setTooltip(incorrectLoginTooltip);
                             loginPane.getChildren().clear();
-                            loginPane.getChildren().addAll(loginLogoImageView, studentNumberTextField, passwordField, loginButton, forgotPasswordHyperlink);
+                            loginPane.getChildren().addAll(loginLogoImageView, lecturerNumberTextField, passwordField, loginButton, forgotPasswordHyperlink);
                             passwordField.clear();
                             passwordField.requestFocus();
                         });
@@ -182,9 +183,12 @@ public class Display extends Application {
         });
         loginButton.setDefaultButton(true);
         forgotPasswordHyperlink = new Hyperlink("Forgot Password?");
+        forgotPasswordHyperlink.setOnAction(e -> {
+            new ForgotPasswordDialog(stage, connectionHandler);
+        });
         loginWaitIndicator = new ProgressIndicator(ProgressIndicator.INDETERMINATE_PROGRESS);
         loginWaitIndicator.setPrefSize(206, 206);
-        loginPane = new VBox(loginLogoImageView, studentNumberTextField, passwordField, loginButton, forgotPasswordHyperlink);
+        loginPane = new VBox(loginLogoImageView, lecturerNumberTextField, passwordField, loginButton, forgotPasswordHyperlink);
         loginPane.setAlignment(Pos.CENTER);
         loginPane.setSpacing(20);
         loginPane.setPadding(new Insets(10));
@@ -198,39 +202,48 @@ public class Display extends Application {
         classText.getStyleClass().add("class-heading-text");
         classSelectComboBox = new ComboBox<>(classAndResults);
         classSelectComboBox.getStyleClass().add("class-select-combo-box");
-        LecturerBadge lecturerBadge = new LecturerBadge();
         classSelectComboBox.getSelectionModel().selectedItemProperty().addListener(e -> {
             if (!classSelectComboBox.getSelectionModel().isEmpty()) {
                 classText.setText(classSelectComboBox.getSelectionModel().getSelectedItem().toString());
-                lecturerBadge.setClassLecturer(classSelectComboBox.getSelectionModel().getSelectedItem().getStudentClass().getClassLecturer());
                 if (classFilesListView != null) {
                     classFilesListView.getItems().clear();
-                    ObservableList<StudentFileObservable> studentFiles = FXCollections.observableArrayList();
-                    for (ClassFile classFile : classSelectComboBox.getSelectionModel().getSelectedItem().getStudentClass().getFiles()) {
-                        studentFiles.add(new StudentFileObservable(classFile));
+                    ObservableList<LecturerFileObservable> studentFiles = FXCollections.observableArrayList();
+                    for (ClassFile classFile : classSelectComboBox.getSelectionModel().getSelectedItem().getFiles()) {
+                        studentFiles.add(new LecturerFileObservable(classFile));
                     }
                     classFilesListView.setItems(studentFiles);
                 }
             }
+            checkAttendance();
         });
-        HBox classHeadingPane = new HBox(classSelectComboBox, classText);
+        doAttendanceButton = new Button("Attendance");
+        doAttendanceButton.setOnAction(e -> {
+            List<String[]> students = new ArrayList<>();
+            for (LecturerStudentAttendance lsa : connectionHandler.attendance) {
+                for (LecturerStudentAttendanceClass lsac : lsa.getClasses()) {
+                    if (!classSelectComboBox.getSelectionModel().isEmpty() && lsac.getClassID() == classSelectComboBox.getSelectionModel().getSelectedItem().getId()) {
+                        students.add(new String[]{lsa.getStudentFirstName() + " " + lsa.getStudentLastName(), lsa.getStudentNumber()});
+                        break;
+                    }
+                }
+            }
+            new AttendanceDialog(stage, connectionHandler, students, classSelectComboBox.getSelectionModel().getSelectedItem().getId()).showDialog();
+            try {
+                Thread.sleep(100);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+            checkAttendance();
+        });
+        classHeadingPane = new HBox(classSelectComboBox, classText);
         classHeadingPane.setSpacing(5);
         classHeadingPane.setAlignment(Pos.CENTER);
-        lecturerBadge.setOnMouseClicked(e -> {
-            int i = UserNotification.showLecturerContactMethod(stage);
-            if (i == 1) {
-                new EmailDialog(stage, lecturerBadge.getLecturerName(), lecturerBadge.getLecturerEmail(), connectionHandler.student.getStudent().getFirstName() + " " + connectionHandler.student.getStudent().getLastName(), connectionHandler.student.getStudent().getEmail()).showDialog();
-            }
-        });
-        HBox classLecturerPane = new HBox(lecturerBadge);
-        classLecturerPane.setAlignment(Pos.CENTER);
-        classLecturerPane.setSpacing(15);
         classFilesListView = new ListView<>();
         classFilesListView.getStyleClass().add("files-list-view");
         classFilesListView.setPlaceholder(new Label("No files available for this class"));
-        classFilesListView.setCellFactory(param -> new ListCell<StudentFileObservable>() {
+        classFilesListView.setCellFactory(param -> new ListCell<LecturerFileObservable>() {
             @Override
-            protected void updateItem(StudentFileObservable file, boolean empty) {
+            protected void updateItem(LecturerFileObservable file, boolean empty) {
 
                 super.updateItem(file, empty);
 
@@ -279,7 +292,7 @@ public class Display extends Application {
                     ConnectionHandler.FileDownloader fileDownloader = connectionHandler.new FileDownloader(file.getClassFile());
                     fileDownloader.start();
                     file.getClassFile().setFileDownloader(fileDownloader);
-                    connectionHandler.student.update();
+                    connectionHandler.lecturer.update();
                 });
                 ContextMenu downloadContextMenu = new ContextMenu(downloadFileMenuItem);
                 downloadContextMenu.getStyleClass().add("file-context-menu");
@@ -324,11 +337,51 @@ public class Display extends Application {
         classFilesListView.focusedProperty().addListener((observable, oldValue, newValue) -> {
             if (!newValue) classFilesListView.getSelectionModel().clearSelection();
         });
-        HBox classFilesPane = new HBox(classFilesListView);
+        Button uploadButton = new Button("+");
+        uploadButton.setMinSize(50, 50);
+        uploadButton.setMaxSize(50, 50);
+        uploadButton.setStyle("-fx-background-color: #ffb81c;" +
+                "-fx-background-radius: 25;" +
+                "-fx-border-radius: 25;" +
+                "-fx-font-size: 22;");
+        uploadButton.setOnAction(e -> {
+            if (!classSelectComboBox.getSelectionModel().isEmpty()) {
+                try {
+                    FileChooser fileChooser = new FileChooser();
+                    fileChooser.setTitle("Select file to upload..");
+                    File file = fileChooser.showOpenDialog(stage);
+                    if (file != null) {
+                        File localNewFile = new File(LOCAL_CACHE.getAbsolutePath() + "/" + classSelectComboBox.getSelectionModel().getSelectedItem().getId() + "/" + file.getName());
+                        localNewFile.getParentFile().mkdirs();
+                        Files.copy(file.toPath(), localNewFile.toPath());
+                        UploadFile uploadFile = new UploadFile(file.getName(), classSelectComboBox.getSelectionModel().getSelectedItem().getId(), Files.readAllBytes(file.toPath()));
+                        System.out.println(file.getName());
+                        UploadDialog uploadDialog = new UploadDialog(stage);
+                        uploading.addListener(al -> {
+                            if (!uploading.get()) {
+                                uploadDialog.closeAnimation();
+                            }
+                        });
+                        uploading.set(true);
+                        new Thread(() -> {
+                            connectionHandler.sendData(uploadFile);
+                            uploading.set(false);
+                        }).start();
+                        uploadDialog.showDialog();
+                    }
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+            }
+        });
+        VBox uploadPane = new VBox(uploadButton);
+        uploadPane.setAlignment(Pos.BOTTOM_LEFT);
+        uploadPane.setPadding(new Insets(0, 0, -32, -16));
+        HBox classFilesPane = new HBox(classFilesListView, uploadPane);
         HBox.setHgrow(classFilesListView, Priority.ALWAYS);
         classFilesPane.setAlignment(Pos.CENTER);
         classFilesPane.setPadding(new Insets(15, 150, 30, 150));
-        VBox classPane = new VBox(classHeadingPane, classLecturerPane, classFilesPane);
+        VBox classPane = new VBox(classHeadingPane, classFilesPane);
         VBox.setVgrow(classFilesPane, Priority.ALWAYS);
         classPane.setSpacing(20);
         classPane.setPadding(new Insets(15));
@@ -368,17 +421,27 @@ public class Display extends Application {
 
         //Setup results pane
         //<editor-fold desc="Results Pane">
-        VBox resultsPane = new VBox();
+        Text resultText = new Text("Results");
+        resultText.getStyleClass().add("heading-text");
         resultsInnerPane = new VBox();
         resultsInnerPane.setAlignment(Pos.CENTER);
-        resultsInnerPane.setSpacing(15);
+        resultsInnerPane.setSpacing(25);
         resultsInnerPane.setPadding(new Insets(20));
         ScrollPane resultsScrollPane = new ScrollPane(resultsInnerPane);
+        resultsInnerPane.setOnScroll(event -> {
+            double deltaY = event.getDeltaY() * 10;
+            double width = resultsScrollPane.getContent().getBoundsInLocal().getWidth();
+            double vValue = resultsScrollPane.getVvalue();
+            resultsScrollPane.setVvalue(vValue + -deltaY / width);
+        });
         VBox.setVgrow(resultsScrollPane, Priority.ALWAYS);
         resultsInnerPane.prefHeightProperty().bind(resultsScrollPane.heightProperty().subtract(46D));
         resultsScrollPane.setFitToWidth(true);
-        resultsPane.getChildren().addAll(resultsScrollPane);
-        resultsPane.setAlignment(Pos.CENTER);
+        VBox resultsPane = new VBox(resultText, resultsScrollPane);
+        //resultsPane.getChildren().addAll(resultsScrollPane);
+        resultsPane.setPadding(new Insets(15));
+        resultsPane.setAlignment(Pos.TOP_CENTER);
+        resultsPane.setSpacing(25);
         //</editor-fold>
 
         //Setup noticeboard pane
@@ -414,8 +477,19 @@ public class Display extends Application {
         contactText.getStyleClass().add("heading-text");
         contactDetailsCardPane = new VBox();
         contactDetailsCardPane.setAlignment(Pos.TOP_CENTER);
-        VBox contactPane = new VBox(contactText, contactDetailsCardPane);
-        contactPane.setSpacing(15);
+        contactDetailsCardPane.setSpacing(15);
+        ScrollPane contactScrollPane = new ScrollPane(contactDetailsCardPane);
+        contactDetailsCardPane.setOnScroll(event -> {
+            double deltaY = event.getDeltaY() * 10;
+            double width = contactScrollPane.getContent().getBoundsInLocal().getWidth();
+            double vValue = contactScrollPane.getVvalue();
+            contactScrollPane.setVvalue(vValue + -deltaY / width);
+        });
+        VBox.setVgrow(contactScrollPane, Priority.ALWAYS);
+        contactDetailsCardPane.prefHeightProperty().bind(contactScrollPane.heightProperty().subtract(46D));
+        contactScrollPane.setFitToWidth(true);
+        VBox contactPane = new VBox(contactText, contactScrollPane);
+        contactPane.setSpacing(25);
         contactPane.setPadding(new Insets(15));
         contactPane.setAlignment(Pos.CENTER);
         VBox.setVgrow(contactDetailsCardPane, Priority.ALWAYS);
@@ -448,8 +522,21 @@ public class Display extends Application {
         attendanceInnerPane = new VBox();
         attendanceInnerPane.setAlignment(Pos.CENTER);
         attendanceInnerPane.setSpacing(15);
-        VBox attendancePane = new VBox(attendanceText, attendanceInnerPane);
-        attendancePane.setAlignment(Pos.CENTER);
+        attendanceInnerPane.setPadding(new Insets(20));
+        ScrollPane attendanceScrollPane = new ScrollPane(attendanceInnerPane);
+        attendanceInnerPane.setOnScroll(event -> {
+            double deltaY = event.getDeltaY() * 10;
+            double width = attendanceScrollPane.getContent().getBoundsInLocal().getWidth();
+            double vValue = attendanceScrollPane.getVvalue();
+            attendanceScrollPane.setVvalue(vValue + -deltaY / width);
+        });
+        VBox.setVgrow(attendanceScrollPane, Priority.ALWAYS);
+        attendanceInnerPane.prefHeightProperty().bind(attendanceScrollPane.heightProperty().subtract(46D));
+        attendanceScrollPane.setFitToWidth(true);
+        VBox attendancePane = new VBox(attendanceText, attendanceScrollPane);
+        attendancePane.setPadding(new Insets(15));
+        attendancePane.setSpacing(25);
+        attendancePane.setAlignment(Pos.TOP_CENTER);
         //</editor-fold>
 
         //Setup side tab pane
@@ -463,7 +550,7 @@ public class Display extends Application {
         SideTab attendanceTab = new SideTab("M960 352l-288-288-96 96-64-64 160-160 352 352zM448 192h320v115.128c-67.22 39.2-156.308 66.11-256 74.26v52.78c70.498 39.728 128 138.772 128 237.832 0 159.058 0 288-192 288s-192-128.942-192-288c0-99.060 57.502-198.104 128-237.832v-52.78c-217.102-17.748-384-124.42-384-253.388h448v64z", 32, 32, "Attendance", attendancePane);
         SideTab settingsSideTab = new SideTab("M585.143 438.857q0 60.571-42.857 103.429t-103.429 42.857-103.429-42.857-42.857-103.429 42.857-103.429 103.429-42.857 103.429 42.857 42.857 103.429zM877.714 501.143v-126.857q0-6.857-4.571-13.143t-11.429-7.429l-105.714-16q-10.857-30.857-22.286-52 20-28.571 61.143-78.857 5.714-6.857 5.714-14.286t-5.143-13.143q-15.429-21.143-56.571-61.714t-53.714-40.571q-6.857 0-14.857 5.143l-78.857 61.714q-25.143-13.143-52-21.714-9.143-77.714-16.571-106.286-4-16-20.571-16h-126.857q-8 0-14 4.857t-6.571 12.286l-16 105.143q-28 9.143-51.429 21.143l-80.571-61.143q-5.714-5.143-14.286-5.143-8 0-14.286 6.286-72 65.143-94.286 96-4 5.714-4 13.143 0 6.857 4.571 13.143 8.571 12 29.143 38t30.857 40.286q-15.429 28.571-23.429 56.571l-104.571 15.429q-7.429 1.143-12 7.143t-4.571 13.429v126.857q0 6.857 4.571 13.143t10.857 7.429l106.286 16q8 26.286 22.286 52.571-22.857 32.571-61.143 78.857-5.714 6.857-5.714 13.714 0 5.714 5.143 13.143 14.857 20.571 56.286 61.429t54 40.857q7.429 0 14.857-5.714l78.857-61.143q25.143 13.143 52 21.714 9.143 77.714 16.571 106.286 4 16 20.571 16h126.857q8 0 14-4.857t6.571-12.286l16-105.143q28-9.143 51.429-21.143l81.143 61.143q5.143 5.143 13.714 5.143 7.429 0 14.286-5.714 73.714-68 94.286-97.143 4-4.571 4-12.571 0-6.857-4.571-13.143-8.571-12-29.143-38t-30.857-40.286q14.857-28.571 23.429-56l104.571-16q7.429-1.143 12-7.143t4.571-13.429z", 32, 32, "Settings", null);
         SideTab signOutSideTab = new SideTab("M365.714 128q0-2.286 0.571-11.429t0.286-15.143-1.714-13.429-5.714-11.143-11.714-3.714h-182.857q-68 0-116.286 48.286t-48.286 116.286v402.286q0 68 48.286 116.286t116.286 48.286h182.857q7.429 0 12.857-5.429t5.429-12.857q0-2.286 0.571-11.429t0.286-15.143-1.714-13.429-5.714-11.143-11.714-3.714h-182.857q-37.714 0-64.571-26.857t-26.857-64.571v-402.286q0-37.714 26.857-64.571t64.571-26.857h178.286t6.571-0.571 6.571-1.714 4.571-3.143 4-5.143 1.143-7.714zM896 438.857q0-14.857-10.857-25.714l-310.857-310.857q-10.857-10.857-25.714-10.857t-25.714 10.857-10.857 25.714v164.571h-256q-14.857 0-25.714 10.857t-10.857 25.714v219.429q0 14.857 10.857 25.714t25.714 10.857h256v164.571q0 14.857 10.857 25.714t25.714 10.857 25.714-10.857l310.857-310.857q10.857-10.857 10.857-25.714z", 32, 32, "Sign Out", null);
-        sideTabPane = new SideTabPane(classSideTab, rosterSideTab, resultsSideTab, noticeboardSideTab, contactSideTab, importantDatesSideTab, attendanceTab, settingsSideTab, signOutSideTab);
+        sideTabPane = new SideTabPane(connectionHandler, classSideTab, rosterSideTab, resultsSideTab, noticeboardSideTab, contactSideTab, importantDatesSideTab, attendanceTab, settingsSideTab, signOutSideTab);
         sideTabPane.setParent(stage);
         //</editor-fold>
 
@@ -488,13 +575,13 @@ public class Display extends Application {
         connectionTypeLabel.getStyleClass().add("top-pane-text");
         HBox connectionTypePane = new HBox(connectionTypeLabel);
         connectionTypePane.setAlignment(Pos.CENTER);
-        studentInfoLabel = new Label();
-        studentInfoLabel.getStyleClass().add("top-pane-text");
-        HBox studentInfoPane = new HBox(studentInfoLabel);
+        lecturerInfoLabel = new Label();
+        lecturerInfoLabel.getStyleClass().add("top-pane-text");
+        HBox studentInfoPane = new HBox(lecturerInfoLabel);
         studentInfoPane.setAlignment(Pos.CENTER_RIGHT);
         HBox topPane = new HBox(jfxHamburger, logoImageView, campusLabel, connectionTypePane, studentInfoPane);
-        campusPane.minWidthProperty().bind(studentInfoLabel.widthProperty().subtract(107D));
-        campusPane.maxWidthProperty().bind(studentInfoLabel.widthProperty().subtract(107D));
+        campusPane.minWidthProperty().bind(lecturerInfoLabel.widthProperty().subtract(107D));
+        campusPane.maxWidthProperty().bind(lecturerInfoLabel.widthProperty().subtract(107D));
         HBox.setHgrow(connectionTypePane, Priority.ALWAYS);
         topPane.getStyleClass().add("top-pane");
         //</editor-fold>
@@ -506,9 +593,9 @@ public class Display extends Application {
         backgroundPane.setEffect(new GaussianBlur(50));
         //</editor-fold>
 
-        //Setup student pane
-        //<editor-fold desc="Student Pane">
-        studentPane = new VBox(topPane, sideTabPane);
+        //Setup lecturer pane
+        //<editor-fold desc="Lecturer Pane">
+        lecturerPane = new VBox(topPane, sideTabPane);
         VBox.setVgrow(sideTabPane, Priority.ALWAYS);
         //</editor-fold>
 
@@ -517,29 +604,24 @@ public class Display extends Application {
         contentPane = new StackPane(backgroundPane, loginPane);
         //</editor-fold>
 
-        //Setup student update listener
-        //<editor-fold desc="Student Update Listener">
-        connectionHandler.student.update.addListener((observable, oldV, newV) -> {
+        //Setup lecturer update listener
+        //<editor-fold desc="Lecturer Update Listener">
+        connectionHandler.lecturer.update.addListener((observable, oldV, newV) -> {
             if (newV) {
-                System.out.println("Student updated");
-                if (connectionHandler.student.getStudent() != null && connectionHandler.student.getStudent().getClassResultAttendances() != null) {
+                if (connectionHandler.lecturer.getLecturer() != null && connectionHandler.lecturer.getLecturer().getClasses() != null) {
                     Platform.runLater(() -> {
                         String prevSelected = null;
                         if (!classSelectComboBox.getSelectionModel().isEmpty()) {
-                            prevSelected = classSelectComboBox.getSelectionModel().getSelectedItem().getStudentClass().getModuleNumber();
+                            prevSelected = classSelectComboBox.getSelectionModel().getSelectedItem().getModuleNumber();
                         }
                         classAndResults.clear();
-                        classAndResults.addAll(connectionHandler.student.getStudent().getClassResultAttendances());
-                        resultsInnerPane.getChildren().clear();
-                        for (ClassResultAttendance result : classAndResults) {
-                            resultsInnerPane.getChildren().add(new ResultPane(result));
-                        }
+                        classAndResults.addAll(connectionHandler.lecturer.getLecturer().getClasses());
                         if (prevSelected == null) {
                             SetTimeSlot:
                             if (!classSelectComboBox.getItems().isEmpty()) {
                                 int dayOfWeek = Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1;
-                                for (ClassResultAttendance car : classSelectComboBox.getItems()) {
-                                    for (ClassTime ct : car.getStudentClass().getClassTimes()) {
+                                for (LecturerClass car : classSelectComboBox.getItems()) {
+                                    for (ClassTime ct : car.getClassTimes()) {
                                         if (ct.getDayOfWeek() == dayOfWeek && currentTimeslot.get() >= ct.getStartSlot() && currentTimeslot.get() <= ct.getEndSlot()) {
                                             classSelectComboBox.getSelectionModel().select(car);
                                             break SetTimeSlot;
@@ -549,18 +631,17 @@ public class Display extends Application {
                                 classSelectComboBox.getSelectionModel().select(0);
                             }
                         } else {
-                            for (ClassResultAttendance car : classAndResults) {
-                                if (car.getStudentClass().getModuleNumber().equals(prevSelected)) {
+                            for (LecturerClass car : classAndResults) {
+                                if (car.getModuleNumber().equals(prevSelected)) {
                                     classSelectComboBox.getSelectionModel().select(car);
                                 }
                             }
                         }
-                        Student student = connectionHandler.student.getStudent();
-                        studentInfoLabel.setText(student.getFirstName() + " " + student.getLastName() + " " + student.getStudentNumber());
+                        Lecturer lecturer = connectionHandler.lecturer.getLecturer();
+                        lecturerInfoLabel.setText(lecturer.getFirstName() + " " + lecturer.getLastName() + " " + lecturer.getLecturerNumber());
                         populateTimetable();
                         populateContactDetails();
                         populateImportantDates();
-                        populateAttendance();
                     });
                 }
             }
@@ -572,10 +653,43 @@ public class Display extends Application {
         connectionHandler.notices.addListener((InvalidationListener) e -> {
             populateNoticeBoard();
         });
-        connectionHandler.notifications.addListener((InvalidationListener) e -> {
-            populateNoticeBoard();
-        });
         //</editor-fold>
+
+        connectionHandler.results.addListener((InvalidationListener) e -> {
+            //TODO
+            resultsInnerPane.getChildren().clear();
+            if (!connectionHandler.results.isEmpty()) {
+                for (LecturerStudentResult lsr : connectionHandler.results) {
+                    Label heading = new Label(lsr.getStudentFirstName() + " - " + lsr.getStudentNumber());
+                    heading.setStyle("-fx-font-size: 24");
+                    VBox resultStudentPane = new VBox(heading);
+                    for (LecturerStudentResultClass lsrc : lsr.getClasses()) {
+                        resultStudentPane.getChildren().add(new ResultPane(lsrc.getModuleName(), lsrc.getResults()));
+                    }
+                    resultStudentPane.setAlignment(Pos.CENTER);
+                    resultStudentPane.setSpacing(15);
+                    resultsInnerPane.getChildren().add(resultStudentPane);
+                }
+            }
+        });
+
+        connectionHandler.attendance.addListener((InvalidationListener) e -> {
+            //TODO
+            attendanceInnerPane.getChildren().clear();
+            if (!connectionHandler.attendance.isEmpty()) {
+                for (LecturerStudentAttendance lsa : connectionHandler.attendance) {
+                    Label heading = new Label(lsa.getStudentFirstName() + " - " + lsa.getStudentNumber());
+                    heading.setStyle("-fx-font-size: 24");
+                    VBox attendanceStudentPane = new VBox(heading);
+                    for (LecturerStudentAttendanceClass lsac : lsa.getClasses()) {
+                        attendanceStudentPane.getChildren().add(new AttendanceCard(lsac.getModuleName(), lsac.getAttendance()));
+                    }
+                    attendanceStudentPane.setAlignment(Pos.CENTER);
+                    attendanceStudentPane.setSpacing(15);
+                    attendanceInnerPane.getChildren().add(attendanceStudentPane);
+                }
+            }
+        });
 
         //Setup contact details update listener
         //<editor-fold desc="Contact Details Update Listener">
@@ -610,11 +724,37 @@ public class Display extends Application {
         scene.getStylesheets().add(getClass().getClassLoader().getResource("CampusLiveStyle.css").toExternalForm());
         //</editor-fold>
 
+        //Start timeslot updater
+        //<editor-fold desc="Timeslot Updater">
+        new TimeslotUpdater().start();
+        //</editor-fold>
+
         //Set and display scene
         //<editor-fold desc="Display Scene">
         stage.setScene(scene);
         stage.show();
         //</editor-fold>
+    }
+
+    void checkAttendance() {
+        if (!classSelectComboBox.getSelectionModel().isEmpty() && isClassTime(classSelectComboBox.getSelectionModel().getSelectedItem()) && !connectionHandler.hasAttendance(classSelectComboBox.getSelectionModel().getSelectedItem().getId())) { //has to do attendance
+            if (!classHeadingPane.getChildren().contains(doAttendanceButton)) {
+                classHeadingPane.getChildren().add(doAttendanceButton);
+            }
+        } else if(classHeadingPane.getChildren().contains(doAttendanceButton)) {
+            classHeadingPane.getChildren().remove(doAttendanceButton);
+        }
+
+    }
+
+    Boolean isClassTime(LecturerClass lecturerClass) {
+        int currentTimeSlot = getCurrentTimeSlot();
+        for (ClassTime classTime : lecturerClass.getClassTimes()) {
+            if (classTime.getDayOfWeek() == Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1 && classTime.getStartSlot() <= currentTimeSlot && classTime.getEndSlot() >= currentTimeSlot) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static String getFileNameWithoutExtension(String fileName) {
@@ -669,7 +809,7 @@ public class Display extends Application {
     }
 
     private void populateTimetable() {
-        List<ClassResultAttendance> classAndResults = classSelectComboBox.getItems();
+        List<LecturerClass> classAndResults = classSelectComboBox.getItems();
         timetableGridPane.getChildren().clear();
         String[] weekdays = {"Mo", "Tu", "We", "Th", "Fr"};
         for (int i = 0; i < 5; i++) {
@@ -689,12 +829,11 @@ public class Display extends Application {
             timetableGridPane.add(labelPane, i + 1, 0);
         }
         int classNumber = 0;
-        for (ClassResultAttendance cr : classAndResults) {
-            String moduleName = cr.getStudentClass().getModuleName();
-            String lecturerInitials = cr.getStudentClass().getClassLecturer().getFirstName().charAt(0) + "" + cr.getStudentClass().getClassLecturer().getLastName().charAt(0);
-            for (ClassTime ct : cr.getStudentClass().getClassTimes()) {
+        for (LecturerClass cr : classAndResults) {
+            String moduleName = cr.getModuleName();
+            for (ClassTime ct : cr.getClassTimes()) {
                 for (int i = ct.getStartSlot(); i <= ct.getEndSlot(); i++) {
-                    TimetableBlock timetableBlock = new TimetableBlock(moduleName + "\n\n" + lecturerInitials + " (" + ct.getRoomNumber() + ")", classNumber);
+                    TimetableBlock timetableBlock = new TimetableBlock(moduleName + "\n\n(" + ct.getRoomNumber() + ")", classNumber);
                     timetableBlock.setOnMouseClicked(e -> {
                         Platform.runLater(() -> {
                             classSelectComboBox.getSelectionModel().select(cr);
@@ -712,56 +851,28 @@ public class Display extends Application {
 
     private void populateNoticeBoard() {
         ObservableList<StackPane> noticePanes = FXCollections.observableArrayList();
-        for (Notification nb : connectionHandler.notifications) {
-            noticePanes.add(new NoticeboardCard(stage, nb.getHeading(), nb.getDescription(), false));
-        }
         for (Notice nb : connectionHandler.notices) {
-            noticePanes.add(new NoticeboardCard(stage, nb.getHeading(), nb.getDescription(), true));
+            noticePanes.add(new NoticeboardCard(stage, nb.getHeading(), nb.getDescription(), false));
         }
         noticeboardInnerPane.getChildren().clear();
         noticeboardInnerPane.getChildren().addAll(noticePanes);
     }
 
     private void populateContactDetails() {
-        if (connectionHandler.student.getStudent() != null) {
-            ObservableList<ContactDetailsCard> contactDetailsCards = FXCollections.observableArrayList();
-            for (ContactDetails contactDetails : connectionHandler.contactDetails) {
-                contactDetailsCards.add(new ContactDetailsCard(stage, contactDetails, connectionHandler.student.getStudent().getFirstName() + " " + connectionHandler.student.getStudent().getLastName(), connectionHandler.student.getStudent().getEmail()));
-            }
-            ObservableList<String> lecturersCompleted = FXCollections.observableArrayList();
-            for (ClassResultAttendance cra : classAndResults) {
-                ClassLecturer classLecturer = cra.getStudentClass().getClassLecturer();
-                byte[] lecturerImageBytes = new byte[0];
-                try {
-                    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-                    ImageIO.write(SwingFXUtils.fromFXImage(classLecturer.getLecturerImage(), null), "jpg", byteArrayOutputStream);
-                    byteArrayOutputStream.flush();
-                    lecturerImageBytes = byteArrayOutputStream.toByteArray();
-                    byteArrayOutputStream.close();
-                } catch (Exception ex) {
-                    ex.printStackTrace();
+        Platform.runLater(() -> {
+            if (connectionHandler.lecturer.getLecturer() != null) {
+                ObservableList<ContactDetailsCard> contactDetailsCards = FXCollections.observableArrayList();
+                for (ContactDetails contactDetails : connectionHandler.contactDetails) {
+                    contactDetailsCards.add(new ContactDetailsCard(stage, contactDetails, connectionHandler.lecturer.getLecturer().getFirstName() + " " + connectionHandler.lecturer.getLecturer().getLastName(), connectionHandler.lecturer.getLecturer().getEmail()));
                 }
-                ContactDetails newContactDetails = new ContactDetails(classLecturer.getFirstName() + " " + classLecturer.getLastName(), "ClassLecturer", classLecturer.getContactNumber(), classLecturer.getEmail(), lecturerImageBytes);
-                ContactDetailsCard contactDetailsCard = new ContactDetailsCard(stage, newContactDetails, connectionHandler.student.getStudent().getFirstName() + " " + connectionHandler.student.getStudent().getLastName(), connectionHandler.student.getStudent().getEmail());
-                if (!lecturersCompleted.contains(classLecturer.getLecturerID())) {
-                    contactDetailsCards.add(contactDetailsCard);
-                    lecturersCompleted.add(classLecturer.getLecturerID());
-                }
+                contactDetailsCardPane.getChildren().clear();
+                contactDetailsCardPane.getChildren().addAll(contactDetailsCards);
             }
-            contactDetailsCardPane.getChildren().clear();
-            contactDetailsCardPane.getChildren().addAll(contactDetailsCards);
-        }
+        });
     }
 
     private void populateImportantDates() {
         importantDateTableView.setItems(connectionHandler.importantDates);
-    }
-
-    private void populateAttendance() {
-        attendanceInnerPane.getChildren().clear();
-        for (ClassResultAttendance cra : classAndResults) {
-            attendanceInnerPane.getChildren().add(new AttendanceCard(cra.getStudentClass().getModuleName(), cra.getAttendance()));
-        }
     }
 
     private String getBuild() {
@@ -792,6 +903,7 @@ public class Display extends Application {
                             }
                         }
                     }
+                    checkAttendance();
                 });
                 try {
                     Thread.sleep(5000);

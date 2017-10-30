@@ -8,6 +8,8 @@ import javafx.beans.property.SimpleIntegerProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import models.all.*;
+import models.lecturer.LecturerStudentAttendance;
+import models.lecturer.LecturerStudentResult;
 
 import javax.net.ssl.SSLSocketFactory;
 import java.io.File;
@@ -22,12 +24,12 @@ public class ConnectionHandler {
 
     public static final int PORT = 25760;
     public static final String LOCAL_ADDRESS = "127.0.0.1";
-    public static final String INTERNET_ADDRESS = "swooosh.ddns.net";
-    public StudentObservable student = new StudentObservable(null);
+    public LecturerObservable lecturer = new LecturerObservable(null);
     public volatile ObservableList<Notice> notices = FXCollections.observableArrayList();
-    public volatile ObservableList<Notification> notifications = FXCollections.observableArrayList();
     public volatile ObservableList<ContactDetails> contactDetails = FXCollections.observableArrayList();
     public volatile ObservableList<ImportantDate> importantDates = FXCollections.observableArrayList();
+    public volatile ObservableList<LecturerStudentAttendance> attendance = FXCollections.observableArrayList();
+    public volatile ObservableList<LecturerStudentResult> results = FXCollections.observableArrayList();
     public volatile ObservableList<String> outputQueue = FXCollections.observableArrayList();
     public volatile ObservableList<Object> inputQueue = FXCollections.observableArrayList();
     public String connectionType = "On Campus";
@@ -36,21 +38,15 @@ public class ConnectionHandler {
     private ObjectInputStream objectInputStream;
 
     public ConnectionHandler() {
-        //TODO connection
         connect();
     }
 
     //<editor-fold desc="Connection">
     private void connect() {
-        //FIXME load times are too long
         if (!connectLocal()) {
-            if (!connectInternet()) {
-                UserNotification.showErrorMessage("Connection Error", "Failed to connect to CampusLive Servers!\nPlease check your network connection and try again!");
-                System.out.println("Exiting..");
-                System.exit(0);
-            } else {
-                connectionType = "Off Campus";
-            }
+            UserNotification.showErrorMessage("Connection Error", "Failed to connect to CampusLive Servers!\nPlease check your network connection and try again!");
+            System.out.println("Exiting..");
+            System.exit(0);
         }
         new InputProcessor().start();
         new OutputProcessor().start();
@@ -70,21 +66,6 @@ public class ConnectionHandler {
         }
         return false;
     }
-
-    private Boolean connectInternet() {
-        System.out.println("Trying to connect to internet server...");
-        try {
-            System.setProperty("javax.net.ssl.trustStore", "src/main/resources/campuslive.store");
-            socket = SSLSocketFactory.getDefault().createSocket(INTERNET_ADDRESS, PORT);
-            objectOutputStream = new ObjectOutputStream(socket.getOutputStream());
-            objectInputStream = new ObjectInputStream(socket.getInputStream());
-            System.out.println("Socket is connected");
-            return true;
-        } catch (Exception ex) {
-            System.out.println("Could not connect to internet server");
-        }
-        return false;
-    }
     //</editor-fold>
 
     public String getConnectionType() {
@@ -92,14 +73,9 @@ public class ConnectionHandler {
     }
 
     //<editor-fold desc="Commands">
-    public Boolean authorise(String studentNumber, String password) {
-        outputQueue.add("sa:" + studentNumber + ":" + password);
-        return getStringReply("sa:");
-    }
-
-    public Boolean isLecturerOnline(String lecturerNumber) {
-        outputQueue.add("lo:" + lecturerNumber);
-        return getStringReply("lo:");
+    public Boolean authorise(String lecturerNumber, String password) {
+        outputQueue.add("la:" + lecturerNumber + ":" + password);
+        return getStringReply("la:");
     }
 
     public Boolean changePassword(String prevPassword, String newPassword) {
@@ -107,9 +83,18 @@ public class ConnectionHandler {
         return getStringReply("cp:");
     }
 
-    public Boolean forgotPassword(String email) {
-        outputQueue.add("fp:" + email);
-        return getStringReply("fp:");
+    public boolean isDefaultPassword() {
+        outputQueue.add("idp:");
+        return getStringReply("idp:");
+    }
+
+    public Boolean changeDefaultPassword(String newPassword) {
+        outputQueue.add("cdp:" + newPassword);
+        return getStringReply("cdp:");
+    }
+
+    public void forgotPassword(String email) {
+        outputQueue.add("flp:" + email);
     }
 
     public void sendMessage(String message, String lecturerNumber) {
@@ -121,9 +106,9 @@ public class ConnectionHandler {
         updateSavedFiles();
     }
 
-    public void sendData(String data) {
+    public void sendData(Object data) {
         try {
-            objectOutputStream.writeUTF(data);
+            objectOutputStream.writeObject(data);
             objectOutputStream.flush();
             System.out.println("Sent data: " + data);
         } catch (Exception ex) {
@@ -143,10 +128,15 @@ public class ConnectionHandler {
         return null;
     }
 
+    Boolean hasAttendance(int classID) {
+        sendData("ha:" + classID);
+        return getStringReply("ha:");
+    }
+
     public void updateSavedFiles() {
         Boolean updated = false;
-        for (ClassResultAttendance car : student.getStudent().getClassResultAttendances()) {
-            for (ClassFile cf : car.getStudentClass().getFiles()) {
+        for (LecturerClass lc : lecturer.getLecturer().getClasses()) {
+            for (ClassFile cf : lc.getFiles()) {
                 File f;
                 if ((f = new File(Display.LOCAL_CACHE + "/" + cf.getClassID() + "/" + cf.getFileName())).exists() && f.length() == cf.getFileLength()) {
                     if (cf.getValue() != 1) {
@@ -160,10 +150,10 @@ public class ConnectionHandler {
                 }
             }
             try {
-                File classFolder = new File(Display.LOCAL_CACHE + "/" + car.getStudentClass().getClassID());
+                File classFolder = new File(Display.LOCAL_CACHE + "/" + lc.getId());
                 for (File file : classFolder.listFiles()) {
                     Boolean found = false;
-                    for (ClassFile cf : car.getStudentClass().getFiles()) {
+                    for (ClassFile cf : lc.getFiles()) {
                         if (cf.getFileName().equals(file.getName()) && cf.getFileLength() == file.length()) {
                             found = true;
                         }
@@ -177,7 +167,7 @@ public class ConnectionHandler {
             }
         }
         if (updated) {
-            Platform.runLater(() -> student.update());
+            Platform.runLater(() -> lecturer.update());
             System.out.println("Files Updated");
         }
     }
@@ -207,8 +197,8 @@ public class ConnectionHandler {
         return contactDetails;
     }
 
-    public Boolean studentInitialized() {
-        return student.getStudent() != null;
+    public Boolean lecturerInitialized() {
+        return lecturer.getLecturer() != null;
     }
 
     private class InputProcessor extends Thread {
@@ -216,29 +206,44 @@ public class ConnectionHandler {
             while (true) {
                 Object input;
                 if ((input = getReply()) != null) {
-                    if (input instanceof Student) {
-                        student.setStudent((Student) input);
+                    if (input instanceof Lecturer) {
+                        lecturer.setLecturer((Lecturer) input);
                         updateSavedFiles();
-                        student.update();
-                        System.out.println("Updated Student");
+                        lecturer.update();
+                        System.out.println("Updated Lecturer");
                     } else if (input instanceof List<?>) {
                         List list = (List) input;
                         if (!list.isEmpty() && list.get(0) instanceof Notice) {
                             notices.clear();
-                            notices.addAll(list);
+                            if (!((Notice) list.get(0)).getHeading().equals("NoNotice")) {
+                                notices.addAll(list);
+                            }
                             System.out.println("Updated Notices");
-                        } else if (!list.isEmpty() && list.get(0) instanceof Notification) {
-                            notifications.clear();
-                            notifications.addAll(list);
-                            System.out.println("Updated Notifications (" + notifications.size() + ")");
                         } else if (!list.isEmpty() && list.get(0) instanceof ContactDetails) {
                             contactDetails.clear();
-                            contactDetails.addAll(list);
+                            if (!((ContactDetails) list.get(0)).getName().equals("NoContactDetails")) {
+                                contactDetails.addAll(list);
+                            }
                             System.out.println("Updated Contact Details");
                         } else if (!list.isEmpty() && list.get(0) instanceof ImportantDate) {
                             importantDates.clear();
-                            importantDates.addAll(list);
+                            if (!((ImportantDate) list.get(0)).getDate().equals("NoImportantDate")) {
+                                importantDates.addAll(list);
+                            }
                             System.out.println("Updated Important Dates");
+                        } else if (!list.isEmpty() && list.get(0) instanceof LecturerStudentAttendance) {
+                            attendance.clear();
+                            if (!((LecturerStudentAttendance) list.get(0)).getStudentFirstName().equals("NoAttendance")) {
+                                System.out.println(list.size());
+                                attendance.addAll(list);
+                            }
+                            System.out.println("Updated Attendance");
+                        } else if (!list.isEmpty() && list.get(0) instanceof LecturerStudentResult) {
+                            results.clear();
+                            if (!((LecturerStudentResult) list.get(0)).getStudentFirstName().equals("NoResults")) {
+                                results.addAll(list);
+                            }
+                            System.out.println("Updated Results");
                         }
                     } else {
                         inputQueue.add(input);
@@ -299,7 +304,7 @@ public class ConnectionHandler {
                     }
                     size.set(size.get() + filePartToRemove.getFileBytes().length);
                     progress.set(1D * size.get() / bytes.length);
-                    Platform.runLater(() -> student.update());
+                    Platform.runLater(() -> lecturer.update());
                     inputQueue.remove(filePartToRemove);
                 }
                 if (size.get() == file.getFileLength()) {

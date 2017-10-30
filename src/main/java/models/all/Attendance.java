@@ -4,19 +4,29 @@ import java.io.Serializable;
 
 public class Attendance implements Serializable {
 
-    private String aDate;
+    private int attendanceID;
+    private String attendanceDate;
     private String attendance;
 
-    public Attendance(String aDate, String attendance) {
-        this.aDate = aDate;
+    public Attendance(int attendanceID, String attendanceDate, String attendance) {
+        this.attendanceID = attendanceID;
+        this.attendanceDate = attendanceDate;
         this.attendance = attendance;
     }
 
-    public String getDate() {
-        return aDate;
+    public int getAttendanceID() {
+        return attendanceID;
+    }
+
+    public String getAttendanceDate() {
+        return attendanceDate;
     }
 
     public String getAttendance() {
         return attendance;
+    }
+
+    public void setAttendance(String attendance) {
+        this.attendance = attendance;
     }
 }

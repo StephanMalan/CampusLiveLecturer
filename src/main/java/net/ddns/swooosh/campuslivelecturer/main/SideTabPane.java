@@ -18,8 +18,10 @@ public class SideTabPane extends HBox {
     private Boolean extended;
     private CustomDialogSkin settingsDialog;
     private Window parent;
+    private ConnectionHandler connectionHandler;
 
-    public SideTabPane(SideTab... tabs) {
+    public SideTabPane(ConnectionHandler connectionHandler, SideTab... tabs) {
+        this.connectionHandler = connectionHandler;
         this.tabs = tabs;
         extended = false;
         spacing = 10;
@@ -47,7 +49,7 @@ public class SideTabPane extends HBox {
             SideTab tab = tabs[i];
             tab.setOnMouseClicked(evt -> {
                 if (tab.getText().equals("Settings")) {
-                    new SettingsDialog(parent).showDialog();
+                    new SettingsDialog(parent, connectionHandler).showDialog();
                 } else if (tab.getText().equals("Sign Out")) {
                     //TODO logout dialog
                     System.exit(0);

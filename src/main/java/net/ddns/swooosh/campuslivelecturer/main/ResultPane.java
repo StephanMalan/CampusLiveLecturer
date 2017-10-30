@@ -6,22 +6,25 @@ import javafx.scene.Node;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Text;
-import models.all.ClassResultAttendance;
 import models.all.Result;
+
+import java.util.List;
 
 public class ResultPane extends VBox {
 
-    private ClassResultAttendance classAndResult;
+    private List<Result> results;
+    private String moduleName;
     private Boolean extended;
 
-    public ResultPane(ClassResultAttendance classAndResult) {
-        this.classAndResult = classAndResult;
+    public ResultPane(String moduleName, List<Result> results) {
+        this.moduleName = moduleName;
+        this.results = results;
         extended = true;
         init();
     }
 
     private void init() {
-        Text headingText = new Text(classAndResult.getStudentClass().getModuleName());
+        Text headingText = new Text(moduleName);
         headingText.getStyleClass().add("result-heading-text");
         HBox.setHgrow(headingText, Priority.ALWAYS);
         HBox headingTextPane = new HBox(headingText);
@@ -48,11 +51,11 @@ public class ResultPane extends VBox {
         headingPane.setAlignment(Pos.CENTER);
         getChildren().add(headingPane);
 
-        getChildren().add(new ResultComponent(new Result("Result Name", 0D, 0D, 0D, 0D)));
+        getChildren().add(new ResultComponent(new Result(0, "", "Result Name", 0D, 0D, 0D, -2D)));
 
         Double dp = 0D;
         Double fm = 0D;
-        for (Result result : classAndResult.getResults()) {
+        for (Result result : results) {
             if (result.getDpWeight() != 0D) {
                 dp += (result.getResult() * result.getDpWeight() / 100D);
                 fm += (result.getResult() * result.getFinalWeight() / 100D);
@@ -60,8 +63,9 @@ public class ResultPane extends VBox {
             }
         }
 
-        if (dp != 0D) {
-            Result dpResult = new Result("Due Performance", dp, 100D, 0D, 0D);
+        if (dp != 0D && dp != -1D) {
+            System.out.println("DP " + dp);
+            Result dpResult = new Result(0, "", "Due Performance", dp, 100D, 0D, 0D);
             getChildren().add(new ResultComponent(dpResult));
         }
 
@@ -71,7 +75,7 @@ public class ResultPane extends VBox {
         double examMark = 0;
         double suppExamMark = 0;
 
-        for (Result result : classAndResult.getResults()) {
+        for (Result result : results) {
             if (result.getResultName().equals("Initial Exam")) {
                 examMark = result.getResult();
             } else if (result.getResultName().equals("Supplementary Exam")) {
@@ -81,7 +85,7 @@ public class ResultPane extends VBox {
 
         //TODO currently only works if result is out of 100
 
-        for (Result result : classAndResult.getResults()) {
+        for (Result result : results) {
             if (result.getDpWeight() == 0D) {
                 if (result.getResultName().equals("Initial Exam")) {
                     if (examMark >= suppExamMark) {
@@ -100,10 +104,10 @@ public class ResultPane extends VBox {
         }
 
         Result fmResult;
-        if (classAndResult.getResults().isEmpty()) {
-            fmResult = new Result("Final Mark", -1D, 100D, 0D, 0D);
+        if (results.isEmpty()) {
+            fmResult = new Result(0, "", "Final Mark", -1D, 100D, 0D, 0D);
         } else {
-            fmResult = new Result("Final Mark", fm, 100D, 0D, 0D);
+            fmResult = new Result(0, "", "Final Mark", fm, 100D, 0D, 0D);
         }
         getChildren().add(new ResultComponent(fmResult));
         setMaxWidth(800);

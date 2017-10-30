@@ -1,6 +1,6 @@
 package net.ddns.swooosh.campuslivelecturer.main;
 
-import com.jfoenix.controls.*;
+import com.jfoenix.controls.JFXButton;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.TextInputDialog;
@@ -15,6 +15,15 @@ public class UserNotification {
     public static void showErrorMessage(String title, String message) {
         Alert alert = new Alert(Alert.AlertType.ERROR);
         alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
+    }
+
+    public static void showConfirmationMessage(String title, String message) {
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
         alert.setContentText(message);
         alert.showAndWait();
     }
@@ -45,7 +54,7 @@ public class UserNotification {
     }
 
     public static int showLecturerContactMethod(Window parent) {
-        CustomDialog customDialog = new CustomDialog(parent, "Contact ClassLecturer", "Do you want to contact lecturer by email or directly?", new JFXButton("Email"), new JFXButton("Direct Message"), new JFXButton("Cancel"));
+        CustomDialog customDialog = new CustomDialog(parent, "Contact Lecturer", "Do you want to contact lecturer by email or directly?", new JFXButton("Email"), new JFXButton("Direct Message"), new JFXButton("Cancel"));
         return customDialog.showDialog();
     }
 
