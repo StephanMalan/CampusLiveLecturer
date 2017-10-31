@@ -16,6 +16,7 @@ import javafx.beans.property.SimpleIntegerProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
+import javafx.event.EventHandler;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Group;
@@ -26,6 +27,9 @@ import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.effect.GaussianBlur;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.input.DragEvent;
+import javafx.scene.input.Dragboard;
+import javafx.scene.input.TransferMode;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Text;
@@ -280,11 +284,13 @@ public class Display extends Application {
                         ex.printStackTrace();
                     }
                 });
-                MenuItem deleteFileMenuItem = new MenuItem("Delete File");
-                deleteFileMenuItem.setOnAction(e -> connectionHandler.deleteFile(file.getClassFile().getClassID(), file.getClassFile().getFileName()));
+                MenuItem deleteFileLocalMenuItem = new MenuItem("Delete File (Local)");
+                deleteFileLocalMenuItem.setOnAction(e -> connectionHandler.deleteFile(file.getClassFile().getClassID(), file.getClassFile().getFileName()));
+                MenuItem deleteFileRemoteMenuItem = new MenuItem("Delete File (Remote)");
+                deleteFileRemoteMenuItem.setOnAction(e -> connectionHandler.deleteFileRemote(file.getClassFile().getClassID(), file.getClassFile().getFileName()));
                 MenuItem detailsMenuItem = new MenuItem("Details");
                 detailsMenuItem.setOnAction(e -> UserNotification.showFileDetails(stage, file.getClassFile()));
-                ContextMenu savedContextMenu = new ContextMenu(openFileMenuItem, exportFileMenuItem, deleteFileMenuItem, detailsMenuItem);
+                ContextMenu savedContextMenu = new ContextMenu(openFileMenuItem, exportFileMenuItem, deleteFileLocalMenuItem, deleteFileRemoteMenuItem, detailsMenuItem);
                 savedContextMenu.getStyleClass().add("file-context-menu");
                 MenuItem downloadFileMenuItem = new MenuItem("Download File");
                 downloadFileMenuItem.setOnAction(e -> {
@@ -333,6 +339,50 @@ public class Display extends Application {
                     }
                 }
             }
+        });
+        classFilesListView.setOnDragOver(event -> {
+            Dragboard db = event.getDragboard();
+            if (db.hasFiles()) {
+                event.acceptTransferModes(TransferMode.COPY);
+            } else {
+                event.consume();
+            }
+        });
+        classFilesListView.setOnDragDropped(event -> {
+            Dragboard dragboard = event.getDragboard();
+            Boolean uploaded = false;
+            if (dragboard.hasFiles()) {
+                uploaded = true;
+                UploadDialog uploadDialog = new UploadDialog(stage);
+                uploading.addListener(al -> {
+                    if (!uploading.get()) {
+                        uploadDialog.closeAnimation();
+                    }
+                });
+                uploading.set(true);
+                ObservableList<File> uploadFiles = FXCollections.observableArrayList();
+                uploadFiles.addAll(dragboard.getFiles());
+                new Thread(() -> {
+                    try {
+                        System.out.println(uploadFiles.size());
+                        for (File newFile : uploadFiles) {
+                            File localNewFile = new File(LOCAL_CACHE.getAbsolutePath() + "/" + classSelectComboBox.getSelectionModel().getSelectedItem().getId() + "/" + newFile.getName());
+                            localNewFile.getParentFile().mkdirs();
+                            Files.copy(newFile.toPath(), localNewFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                            UploadFile uploadFile = new UploadFile(newFile.getName(), classSelectComboBox.getSelectionModel().getSelectedItem().getId(), Files.readAllBytes(newFile.toPath()));
+                            connectionHandler.sendData(uploadFile);
+                        }
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    }
+                    uploading.set(false);
+                }).start();
+                if (uploading.get()) {
+                    uploadDialog.showDialog();
+                }
+            }
+            event.setDropCompleted(uploaded);
+            event.consume();
         });
         classFilesListView.focusedProperty().addListener((observable, oldValue, newValue) -> {
             if (!newValue) classFilesListView.getSelectionModel().clearSelection();
@@ -741,7 +791,7 @@ public class Display extends Application {
             if (!classHeadingPane.getChildren().contains(doAttendanceButton)) {
                 classHeadingPane.getChildren().add(doAttendanceButton);
             }
-        } else if(classHeadingPane.getChildren().contains(doAttendanceButton)) {
+        } else if (classHeadingPane.getChildren().contains(doAttendanceButton)) {
             classHeadingPane.getChildren().remove(doAttendanceButton);
         }
 

@@ -106,6 +106,11 @@ public class ConnectionHandler {
         updateSavedFiles();
     }
 
+    public void deleteFileRemote(int classID, String fileName) {
+        System.out.println("df:" + classID + ":" + fileName);
+        outputQueue.add(0, "df:" + classID + ":" + fileName);
+    }
+
     public void sendData(Object data) {
         try {
             objectOutputStream.writeObject(data);
