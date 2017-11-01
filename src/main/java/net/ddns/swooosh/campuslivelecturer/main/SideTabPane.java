@@ -41,7 +41,7 @@ public class SideTabPane extends HBox {
         tabHeadersPane = new VBox();
         selectedSideTab = tabs[0];
         for (int i = 0; i < tabs.length; i++) {
-            if (i == tabs.length - 2) {
+            if (i == tabs.length - 1) {
                 Pane spacingPane = new Pane();
                 tabHeadersPane.getChildren().add(spacingPane);
                 VBox.setVgrow(spacingPane, Priority.ALWAYS);
@@ -50,9 +50,6 @@ public class SideTabPane extends HBox {
             tab.setOnMouseClicked(evt -> {
                 if (tab.getText().equals("Settings")) {
                     new SettingsDialog(parent, connectionHandler).showDialog();
-                } else if (tab.getText().equals("Sign Out")) {
-                    //TODO logout dialog
-                    System.exit(0);
                 } else {
                     selectedSideTab = (SideTab) evt.getSource();
                     updateSelected();

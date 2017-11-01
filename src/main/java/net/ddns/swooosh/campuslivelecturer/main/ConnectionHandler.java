@@ -108,7 +108,9 @@ public class ConnectionHandler {
 
     public void deleteFileRemote(int classID, String fileName) {
         System.out.println("df:" + classID + ":" + fileName);
+        deleteFile(classID, fileName);
         outputQueue.add(0, "df:" + classID + ":" + fileName);
+
     }
 
     public void sendData(Object data) {
@@ -151,24 +153,26 @@ public class ConnectionHandler {
                 } else if (cf.getValue() == 1) {
                     cf.setValue(0);
                     updated = true;
-
                 }
             }
             try {
                 File classFolder = new File(Display.LOCAL_CACHE + "/" + lc.getId());
-                for (File file : classFolder.listFiles()) {
-                    Boolean found = false;
-                    for (ClassFile cf : lc.getFiles()) {
-                        if (cf.getFileName().equals(file.getName()) && cf.getFileLength() == file.length()) {
-                            found = true;
+                if (classFolder.exists()) {
+                    for (File file : classFolder.listFiles()) {
+                        Boolean found = false;
+                        for (ClassFile cf : lc.getFiles()) {
+                            if (cf.getFileName().equals(file.getName()) && cf.getFileLength() == file.length()) {
+                                found = true;
+                            }
                         }
-                    }
-                    if (!found) {
-                        Files.delete(file.toPath());
-                        System.out.println("Deleted file: " + file.getName());
+                        if (!found) {
+                            Files.delete(file.toPath());
+                            System.out.println("Deleted file: " + file.getName());
+                        }
                     }
                 }
             } catch (Exception ex) {
+                ex.printStackTrace();
             }
         }
         if (updated) {
@@ -239,7 +243,6 @@ public class ConnectionHandler {
                         } else if (!list.isEmpty() && list.get(0) instanceof LecturerStudentAttendance) {
                             attendance.clear();
                             if (!((LecturerStudentAttendance) list.get(0)).getStudentFirstName().equals("NoAttendance")) {
-                                System.out.println(list.size());
                                 attendance.addAll(list);
                             }
                             System.out.println("Updated Attendance");

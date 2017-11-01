@@ -17,6 +17,7 @@ public class UploadDialog extends CustomDialogSkin {
         ProgressIndicator progressIndicator = new ProgressIndicator(ProgressIndicator.INDETERMINATE_PROGRESS);
         progressIndicator.setMinSize(200, 200);
         progressIndicator.setMaxSize(200, 200);
+        progressIndicator.setStyle("-fx-progress-color: #ffb81c");
         VBox settingsInnerPane = new VBox(settingsText, text, progressIndicator);
         settingsInnerPane.getChildren().addAll();
         settingsInnerPane.setSpacing(25);

@@ -50,7 +50,7 @@ import java.util.*;
 
 public class Display extends Application {
 
-    public static final File APPLICATION_FOLDER = new File(System.getProperty("user.home") + "/AppData/Local/Swooosh/CampusLiveStudent");
+    public static final File APPLICATION_FOLDER = new File(System.getProperty("user.home") + "/AppData/Local/Swooosh/CampusLiveLecturer");
     public static final File LOCAL_CACHE = new File(APPLICATION_FOLDER.getAbsolutePath() + "/Local Cache");
     public static BooleanProperty enableAnimations = new SimpleBooleanProperty(true);
     public IntegerProperty currentTimeslot = new SimpleIntegerProperty();
@@ -71,9 +71,10 @@ public class Display extends Application {
     private ListView<LecturerFileObservable> classFilesListView;
     private GridPane timetableGridPane;
     private VBox resultsInnerPane;
+    private ScrollPane noticeboardScrollPane;
     private JFXMasonryPane noticeboardInnerPane;
     private VBox contactDetailsCardPane;
-    private TableView<ImportantDate> importantDateTableView;
+    private ListView<ImportantDate> importantDateListView;
     private VBox attendanceInnerPane;
     private Label lecturerInfoLabel;
     private SideTabPane sideTabPane;
@@ -365,13 +366,18 @@ public class Display extends Application {
                 new Thread(() -> {
                     try {
                         System.out.println(uploadFiles.size());
+                        int classID = classSelectComboBox.getSelectionModel().getSelectedItem().getId();
                         for (File newFile : uploadFiles) {
-                            File localNewFile = new File(LOCAL_CACHE.getAbsolutePath() + "/" + classSelectComboBox.getSelectionModel().getSelectedItem().getId() + "/" + newFile.getName());
-                            localNewFile.getParentFile().mkdirs();
-                            Files.copy(newFile.toPath(), localNewFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                            UploadFile uploadFile = new UploadFile(newFile.getName(), classSelectComboBox.getSelectionModel().getSelectedItem().getId(), Files.readAllBytes(newFile.toPath()));
+                            UploadFile uploadFile = new UploadFile(newFile.getName(), classID, Files.readAllBytes(newFile.toPath()));
                             connectionHandler.sendData(uploadFile);
                         }
+                        for (File newFile : uploadFiles) {
+                            File localNewFile = new File(LOCAL_CACHE.getAbsolutePath() + "/" + classID + "/" + newFile.getName());
+                            localNewFile.getParentFile().mkdirs();
+                            Files.copy(newFile.toPath(), localNewFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                            System.out.println("Copied file: " + newFile.getName());
+                        }
+                        connectionHandler.updateSavedFiles();
                     } catch (Exception ex) {
                         ex.printStackTrace();
                     }
@@ -496,29 +502,15 @@ public class Display extends Application {
 
         //Setup noticeboard pane
         //<editor-fold desc="Noticeboard Pane">
-        noticeboardInnerPane = new JFXMasonryPane();
-        populateNoticeBoard();
-        noticeboardInnerPane.setHSpacing(10);
-        noticeboardInnerPane.setVSpacing(10);
-        noticeboardInnerPane.setLayoutMode(JFXMasonryPane.LayoutMode.MASONRY);
-        //noticeboardInnerPane.setPadding(new Insets(50));
-        noticeboardInnerPane.getStyleClass().add("noticeboard-pane");
-        ScrollPane noticeboardScrollPane = new ScrollPane(new StackPane(noticeboardInnerPane));
-        noticeboardInnerPane.prefHeightProperty().bind(noticeboardScrollPane.heightProperty().subtract(2D));
+        noticeboardScrollPane = new ScrollPane();
         noticeboardScrollPane.setFitToWidth(true);
         noticeboardScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         VBox noticeboardPane = new VBox(noticeboardScrollPane);
         VBox.setVgrow(noticeboardScrollPane, Priority.ALWAYS);
-        noticeboardPane.setOnMouseClicked(e -> {
-            System.out.println(noticeboardInnerPane.getWidth());
-            System.out.println(noticeboardScrollPane.getWidth());
-            System.out.println(noticeboardPane.getWidth());
-        });
         noticeboardScrollPane.widthProperty().addListener(e -> {
             noticeboardInnerPane.setMaxWidth(noticeboardScrollPane.getWidth());
         });
-        //noticeboardInnerPane.maxWidthProperty().bind(noticeboardScrollPane.widthProperty());
-        //noticeboardInnerPane.prefWidthProperty().bind(noticeboardScrollPane.widthProperty());
+        populateNoticeBoard();
         //</editor-fold>
 
         //Setup contact details pane
@@ -550,16 +542,23 @@ public class Display extends Application {
         //<editor-fold desc="Important Dates">
         Text importantDatesText = new Text("Important Dates");
         importantDatesText.getStyleClass().add("heading-text");
-        importantDateTableView = new TableView<>();
-        TableColumn<ImportantDate, String> dateColumn = new TableColumn<>("Date");
-        dateColumn.setCellValueFactory(new PropertyValueFactory<>("date"));
-        dateColumn.prefWidthProperty().bind(importantDateTableView.widthProperty().multiply(0.3));
-        TableColumn<ImportantDate, String> descriptionColumn = new TableColumn<>("Description");
-        descriptionColumn.setCellValueFactory(new PropertyValueFactory<>("description"));
-        descriptionColumn.prefWidthProperty().bind(importantDateTableView.widthProperty().multiply(0.7).subtract(2));
-        importantDateTableView.getColumns().addAll(dateColumn, descriptionColumn);
-        VBox importantDatesPane = new VBox(importantDatesText, importantDateTableView);
-        VBox.setVgrow(importantDateTableView, Priority.ALWAYS);
+
+        importantDateListView = new ListView<>();
+        importantDateListView.getStyleClass().add("files-list-view");
+        importantDateListView.setCellFactory(param -> new ListCell<ImportantDate>() {
+            @Override
+            protected void updateItem(ImportantDate item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText("");
+                } else {
+                    setText("     " + item.getDate() + "   -   " + item.getDescription());
+                }
+            }
+        });
+
+        VBox importantDatesPane = new VBox(importantDatesText, importantDateListView);
+        VBox.setVgrow(importantDateListView, Priority.ALWAYS);
         importantDatesPane.setPadding(new Insets(15, 50, 50, 50));
         importantDatesPane.setSpacing(15);
         importantDatesPane.setAlignment(Pos.CENTER);
@@ -599,8 +598,7 @@ public class Display extends Application {
         SideTab importantDatesSideTab = new SideTab("M73.143 0h164.571v164.571h-164.571v-164.571zM274.286 0h182.857v164.571h-182.857v-164.571zM73.143 201.143h164.571v182.857h-164.571v-182.857zM274.286 201.143h182.857v182.857h-182.857v-182.857zM73.143 420.571h164.571v164.571h-164.571v-164.571zM493.714 0h182.857v164.571h-182.857v-164.571zM274.286 420.571h182.857v164.571h-182.857v-164.571zM713.143 0h164.571v164.571h-164.571v-164.571zM493.714 201.143h182.857v182.857h-182.857v-182.857zM292.571 694.857v164.571q0 7.429-5.429 12.857t-12.857 5.429h-36.571q-7.429 0-12.857-5.429t-5.429-12.857v-164.571q0-7.429 5.429-12.857t12.857-5.429h36.571q7.429 0 12.857 5.429t5.429 12.857zM713.143 201.143h164.571v182.857h-164.571v-182.857zM493.714 420.571h182.857v164.571h-182.857v-164.571zM713.143 420.571h164.571v164.571h-164.571v-164.571zM731.429 694.857v164.571q0 7.429-5.429 12.857t-12.857 5.429h-36.571q-7.429 0-12.857-5.429t-5.429-12.857v-164.571q0-7.429 5.429-12.857t12.857-5.429h36.571q7.429 0 12.857 5.429t5.429 12.857zM950.857 731.428v-731.429q0-29.714-21.714-51.429t-51.429-21.714h-804.571q-29.714 0-51.429 21.714t-21.714 51.429v731.429q0 29.714 21.714 51.429t51.429 21.714h73.143v54.857q0 37.714 26.857 64.571t64.571 26.857h36.571q37.714 0 64.571-26.857t26.857-64.571v-54.857h219.429v54.857q0 37.714 26.857 64.571t64.571 26.857h36.571q37.714 0 64.571-26.857t26.857-64.571v-54.857h73.143q29.714 0 51.429-21.714t21.714-51.429z", 32, 32, "Important Dates", importantDatesPane);
         SideTab attendanceTab = new SideTab("M960 352l-288-288-96 96-64-64 160-160 352 352zM448 192h320v115.128c-67.22 39.2-156.308 66.11-256 74.26v52.78c70.498 39.728 128 138.772 128 237.832 0 159.058 0 288-192 288s-192-128.942-192-288c0-99.060 57.502-198.104 128-237.832v-52.78c-217.102-17.748-384-124.42-384-253.388h448v64z", 32, 32, "Attendance", attendancePane);
         SideTab settingsSideTab = new SideTab("M585.143 438.857q0 60.571-42.857 103.429t-103.429 42.857-103.429-42.857-42.857-103.429 42.857-103.429 103.429-42.857 103.429 42.857 42.857 103.429zM877.714 501.143v-126.857q0-6.857-4.571-13.143t-11.429-7.429l-105.714-16q-10.857-30.857-22.286-52 20-28.571 61.143-78.857 5.714-6.857 5.714-14.286t-5.143-13.143q-15.429-21.143-56.571-61.714t-53.714-40.571q-6.857 0-14.857 5.143l-78.857 61.714q-25.143-13.143-52-21.714-9.143-77.714-16.571-106.286-4-16-20.571-16h-126.857q-8 0-14 4.857t-6.571 12.286l-16 105.143q-28 9.143-51.429 21.143l-80.571-61.143q-5.714-5.143-14.286-5.143-8 0-14.286 6.286-72 65.143-94.286 96-4 5.714-4 13.143 0 6.857 4.571 13.143 8.571 12 29.143 38t30.857 40.286q-15.429 28.571-23.429 56.571l-104.571 15.429q-7.429 1.143-12 7.143t-4.571 13.429v126.857q0 6.857 4.571 13.143t10.857 7.429l106.286 16q8 26.286 22.286 52.571-22.857 32.571-61.143 78.857-5.714 6.857-5.714 13.714 0 5.714 5.143 13.143 14.857 20.571 56.286 61.429t54 40.857q7.429 0 14.857-5.714l78.857-61.143q25.143 13.143 52 21.714 9.143 77.714 16.571 106.286 4 16 20.571 16h126.857q8 0 14-4.857t6.571-12.286l16-105.143q28-9.143 51.429-21.143l81.143 61.143q5.143 5.143 13.714 5.143 7.429 0 14.286-5.714 73.714-68 94.286-97.143 4-4.571 4-12.571 0-6.857-4.571-13.143-8.571-12-29.143-38t-30.857-40.286q14.857-28.571 23.429-56l104.571-16q7.429-1.143 12-7.143t4.571-13.429z", 32, 32, "Settings", null);
-        SideTab signOutSideTab = new SideTab("M365.714 128q0-2.286 0.571-11.429t0.286-15.143-1.714-13.429-5.714-11.143-11.714-3.714h-182.857q-68 0-116.286 48.286t-48.286 116.286v402.286q0 68 48.286 116.286t116.286 48.286h182.857q7.429 0 12.857-5.429t5.429-12.857q0-2.286 0.571-11.429t0.286-15.143-1.714-13.429-5.714-11.143-11.714-3.714h-182.857q-37.714 0-64.571-26.857t-26.857-64.571v-402.286q0-37.714 26.857-64.571t64.571-26.857h178.286t6.571-0.571 6.571-1.714 4.571-3.143 4-5.143 1.143-7.714zM896 438.857q0-14.857-10.857-25.714l-310.857-310.857q-10.857-10.857-25.714-10.857t-25.714 10.857-10.857 25.714v164.571h-256q-14.857 0-25.714 10.857t-10.857 25.714v219.429q0 14.857 10.857 25.714t25.714 10.857h256v164.571q0 14.857 10.857 25.714t25.714 10.857 25.714-10.857l310.857-310.857q10.857-10.857 10.857-25.714z", 32, 32, "Sign Out", null);
-        sideTabPane = new SideTabPane(connectionHandler, classSideTab, rosterSideTab, resultsSideTab, noticeboardSideTab, contactSideTab, importantDatesSideTab, attendanceTab, settingsSideTab, signOutSideTab);
+        sideTabPane = new SideTabPane(connectionHandler, classSideTab, rosterSideTab, resultsSideTab, noticeboardSideTab, contactSideTab, importantDatesSideTab, attendanceTab, settingsSideTab);
         sideTabPane.setParent(stage);
         //</editor-fold>
 
@@ -658,6 +656,7 @@ public class Display extends Application {
         //<editor-fold desc="Lecturer Update Listener">
         connectionHandler.lecturer.update.addListener((observable, oldV, newV) -> {
             if (newV) {
+                connectionHandler.lecturer.update.set(false);
                 if (connectionHandler.lecturer.getLecturer() != null && connectionHandler.lecturer.getLecturer().getClasses() != null) {
                     Platform.runLater(() -> {
                         String prevSelected = null;
@@ -725,20 +724,22 @@ public class Display extends Application {
 
         connectionHandler.attendance.addListener((InvalidationListener) e -> {
             //TODO
-            attendanceInnerPane.getChildren().clear();
-            if (!connectionHandler.attendance.isEmpty()) {
-                for (LecturerStudentAttendance lsa : connectionHandler.attendance) {
-                    Label heading = new Label(lsa.getStudentFirstName() + " - " + lsa.getStudentNumber());
-                    heading.setStyle("-fx-font-size: 24");
-                    VBox attendanceStudentPane = new VBox(heading);
-                    for (LecturerStudentAttendanceClass lsac : lsa.getClasses()) {
-                        attendanceStudentPane.getChildren().add(new AttendanceCard(lsac.getModuleName(), lsac.getAttendance()));
+            Platform.runLater(() -> {
+                attendanceInnerPane.getChildren().clear();
+                if (!connectionHandler.attendance.isEmpty()) {
+                    for (LecturerStudentAttendance lsa : connectionHandler.attendance) {
+                        Label heading = new Label(lsa.getStudentFirstName() + " - " + lsa.getStudentNumber());
+                        heading.setStyle("-fx-font-size: 24");
+                        VBox attendanceStudentPane = new VBox(heading);
+                        for (LecturerStudentAttendanceClass lsac : lsa.getClasses()) {
+                            attendanceStudentPane.getChildren().add(new AttendanceCard(lsac.getModuleName(), lsac.getAttendance()));
+                        }
+                        attendanceStudentPane.setAlignment(Pos.CENTER);
+                        attendanceStudentPane.setSpacing(15);
+                        attendanceInnerPane.getChildren().add(attendanceStudentPane);
                     }
-                    attendanceStudentPane.setAlignment(Pos.CENTER);
-                    attendanceStudentPane.setSpacing(15);
-                    attendanceInnerPane.getChildren().add(attendanceStudentPane);
                 }
-            }
+            });
         });
 
         //Setup contact details update listener
@@ -904,8 +905,24 @@ public class Display extends Application {
         for (Notice nb : connectionHandler.notices) {
             noticePanes.add(new NoticeboardCard(stage, nb.getHeading(), nb.getDescription(), false));
         }
-        noticeboardInnerPane.getChildren().clear();
-        noticeboardInnerPane.getChildren().addAll(noticePanes);
+        Platform.runLater(() -> {
+            noticeboardInnerPane = new JFXMasonryPane();
+            noticeboardInnerPane.getStyleClass().add("noticeboard-pane");
+            noticeboardScrollPane.setContent(new StackPane(noticeboardInnerPane));
+            if (noticePanes.isEmpty()) {
+                noticeboardInnerPane.getChildren().addAll(new NoticeboardCard(stage, "Nothing to show here!", "Watch this space for new information", false));
+                noticeboardInnerPane.setHSpacing(10);
+                noticeboardInnerPane.setVSpacing(10);
+                noticeboardInnerPane.setLayoutMode(JFXMasonryPane.LayoutMode.MASONRY);
+                noticeboardInnerPane.prefHeightProperty().bind(noticeboardScrollPane.heightProperty().subtract(2D));
+            } else {
+                noticeboardInnerPane.getChildren().addAll(noticePanes);
+                noticeboardInnerPane.setHSpacing(10);
+                noticeboardInnerPane.setVSpacing(10);
+                noticeboardInnerPane.setLayoutMode(JFXMasonryPane.LayoutMode.MASONRY);
+                noticeboardInnerPane.prefHeightProperty().bind(noticeboardScrollPane.heightProperty().subtract(2D));
+            }
+        });
     }
 
     private void populateContactDetails() {
@@ -922,7 +939,7 @@ public class Display extends Application {
     }
 
     private void populateImportantDates() {
-        importantDateTableView.setItems(connectionHandler.importantDates);
+        importantDateListView.setItems(connectionHandler.importantDates);
     }
 
     private String getBuild() {
